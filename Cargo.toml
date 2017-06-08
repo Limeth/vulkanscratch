@@ -1,0 +1,9 @@
+[package]
+name = "vulkanscratch"
+version = "0.1.0"
+authors = ["Jakub Hlusička <limeth@protonmail.com>"]
+
+[dependencies]
+vulkano = "0.4.0"
+vulkano-shader-derive = "0.4.0"
+rayon = "0.7.1"

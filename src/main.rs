@@ -6,6 +6,8 @@ extern crate rayon;
 
 use rayon::prelude::*;
 use std::sync::Arc;
+use vulkano::command_buffer::{CommandBuffer, CommandBufferBuilder};
+use vulkano::image::traits::Image;
 
 struct WorkerDevice<'a> {
     physical_device: vulkano::instance::PhysicalDevice<'a>,
@@ -63,35 +65,23 @@ fn main() {
         devices.push(WorkerDevice::new(physical_device));
     }
 
-    let vec: Vec<_> = devices.iter().map(|worker_device| worker_device.device.clone()).collect();
-    println!("{:?}", vec);
-use vulkano::command_buffer::CommandBufferBuilder;
     devices.par_iter_mut().for_each(|device| {
         {
             let mut buffer_content = device.uniform_buffer.write().unwrap();
             buffer_content.input_vec = [buffer_content.input_vec[0] + 1, buffer_content.input_vec[1] + 2];
         }
 
-        /* type debug code
-        let a: () = (
-            [1, 1, 1u32],  // dimensions
-            device.pipeline.clone(),
-            device.set.clone(),
-            (),  // push constants
-        );
-        let output: () = vulkano::command_buffer::AutoCommandBufferBuilder::new(
-            device.device.clone(), device.queue.family()
-        ).unwrap();
-        */
-
-        let output = vulkano::command_buffer::AutoCommandBufferBuilder::new(
+        let submit_sync_layer = vulkano::command_buffer::AutoCommandBufferBuilder::new(
             device.device.clone(), device.queue.family()
         ).unwrap().dispatch(
             [1, 1, 1u32],  // dimensions
             device.pipeline.clone(),
             device.set.clone(),
             (),  // push constants
-        ).unwrap();
+        ).unwrap()
+        .build().unwrap();
+
+        submit_sync_layer.execute(device.queue.clone()).unwrap();
     })
 }
 
@@ -107,7 +97,13 @@ layout(set = 0, binding = 0) uniform Data {
     uvec2 input_vec;
 } uniforms;
 
+layout(set = 0, binding = 1) uniform writeonly uimage1D toTex;
+//layout(set = 0, binding = 1) uniform DataB {
+//    uvec2 hash;
+//} outputs;
+
 void main() {
+    uvec2 outputs = uniforms.input_vec + uvec2(1, 2);
 }
 "]
     struct Dummy;

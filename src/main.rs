@@ -8,14 +8,16 @@ use rayon::prelude::*;
 use std::sync::Arc;
 use vulkano::command_buffer::{CommandBuffer, CommandBufferBuilder};
 use vulkano::image::traits::Image;
+use vulkano::sync::GpuFuture;
 
 struct WorkerDevice<'a> {
     physical_device: vulkano::instance::PhysicalDevice<'a>,
     device: Arc<vulkano::device::Device>,
     queue: Arc<vulkano::device::Queue>,
-    uniform_buffer: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<shader::ty::Data>>,
+    input_buffer: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<shader::ty::InputData>>,
+    output_buffer: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>,
     pipeline: Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>,
-    set: std::sync::Arc<vulkano::descriptor::descriptor_set::SimpleDescriptorSet<((), vulkano::descriptor::descriptor_set::SimpleDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<shader::ty::Data>>>)>>,
+    set: std::sync::Arc<vulkano::descriptor::descriptor_set::SimpleDescriptorSet<(((), vulkano::descriptor::descriptor_set::SimpleDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<shader::ty::InputData>>>), vulkano::descriptor::descriptor_set::SimpleDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>>)>>,
 }
 
 impl<'a> WorkerDevice<'a> {
@@ -28,24 +30,29 @@ impl<'a> WorkerDevice<'a> {
                                                                 [(queue, 0.5)].iter().cloned())
             .expect("failed to create device");
         let queue = queues.next().unwrap();
-        let uniform_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::<shader::ty::Data>
+        let input_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::<shader::ty::InputData>
                                    ::from_data(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()), 
-                                    shader::ty::Data {
+                                    shader::ty::InputData {
                                         input_vec: [10, 20]
                                     })
-            .expect("failed to create buffer");
+            .expect("failed to create input buffer");
+        let output_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
+                                   (0 .. 65536u32).map(|n| n))
+            .expect("failed to create output buffer");
         let shader = shader::Shader::load(&device).expect("Derp.");
         let entry_point = shader.main_entry_point();
         let pipeline = Arc::new(vulkano::pipeline::ComputePipeline::new(device.clone(), &entry_point, &()).unwrap());
         let set = Arc::new(simple_descriptor_set!(pipeline.clone(), 0, {
-            uniforms: uniform_buffer.clone()
+            input_data: input_buffer.clone(),
+            output_data: output_buffer.clone(),
         }));
 
         WorkerDevice {
             physical_device,
             device,
             queue,
-            uniform_buffer,
+            input_buffer,
+            output_buffer,
             pipeline,
             set,
         }
@@ -67,21 +74,31 @@ fn main() {
 
     devices.par_iter_mut().for_each(|device| {
         {
-            let mut buffer_content = device.uniform_buffer.write().unwrap();
+            let mut buffer_content = device.input_buffer.write().unwrap();
             buffer_content.input_vec = [buffer_content.input_vec[0] + 1, buffer_content.input_vec[1] + 2];
         }
 
-        let submit_sync_layer = vulkano::command_buffer::AutoCommandBufferBuilder::new(
+        let command_buffer = vulkano::command_buffer::AutoCommandBufferBuilder::new(
             device.device.clone(), device.queue.family()
         ).unwrap().dispatch(
-            [1, 1, 1u32],  // dimensions
+            [1, 1, 1],  // global workgroup dimensions
             device.pipeline.clone(),
             device.set.clone(),
             (),  // push constants
         ).unwrap()
         .build().unwrap();
 
-        submit_sync_layer.execute(device.queue.clone()).unwrap();
+        let future = vulkano::sync::now(device.device.clone())
+            .then_execute(device.queue.clone(), command_buffer).unwrap()
+            .then_signal_fence_and_flush().unwrap();
+
+        future.wait(None).unwrap();
+
+        let output = device.output_buffer.read().expect("could not lock the output buffer");
+
+        for i in 0 .. 3u32 {
+            println!("{:?}", output[i as usize]);
+        }
     })
 }
 
@@ -90,21 +107,6 @@ fn main() {
 mod shader {
     #[derive(VulkanoShader)]
     #[ty = "compute"]
-    #[src = "
-#version 450
-
-layout(set = 0, binding = 0) uniform Data {
-    uvec2 input_vec;
-} uniforms;
-
-layout(set = 0, binding = 1) uniform writeonly uimage1D toTex;
-//layout(set = 0, binding = 1) uniform DataB {
-//    uvec2 hash;
-//} outputs;
-
-void main() {
-    uvec2 outputs = uniforms.input_vec + uvec2(1, 2);
-}
-"]
+    #[path = "shader/shader.comp"]
     struct Dummy;
 }

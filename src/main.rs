@@ -81,7 +81,7 @@ fn main() {
         let command_buffer = vulkano::command_buffer::AutoCommandBufferBuilder::new(
             device.device.clone(), device.queue.family()
         ).unwrap().dispatch(
-            [1, 1, 1],  // global workgroup dimensions
+            [100, 1, 1],  // global workgroup dimensions
             device.pipeline.clone(),
             device.set.clone(),
             (),  // push constants
@@ -102,8 +102,6 @@ fn main() {
     })
 }
 
-// TODO: Wait for a new release of vulkano and vulkano_shader_derive to use `path` instead of
-// `src`.
 mod shader {
     #[derive(VulkanoShader)]
     #[ty = "compute"]

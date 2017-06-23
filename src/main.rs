@@ -3,21 +3,27 @@ extern crate vulkano;
 #[macro_use]
 extern crate vulkano_shader_derive;
 extern crate rayon;
+extern crate rand;
 
 use rayon::prelude::*;
 use std::sync::Arc;
 use vulkano::command_buffer::{CommandBuffer, CommandBufferBuilder};
 use vulkano::image::traits::Image;
 use vulkano::sync::GpuFuture;
+use rand::os::OsRng;
+use rand::Rng;
+
+const SECRET_KEY_INT_ARRAY_LENGTH: usize = 8;
 
 struct WorkerDevice<'a> {
     physical_device: vulkano::instance::PhysicalDevice<'a>,
     device: Arc<vulkano::device::Device>,
+    max_invocations: usize,
     queue: Arc<vulkano::device::Queue>,
-    input_buffer: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<shader::ty::InputData>>,
+    input_buffer: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>,
     output_buffer: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>,
     pipeline: Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>,
-    set: std::sync::Arc<vulkano::descriptor::descriptor_set::SimpleDescriptorSet<(((), vulkano::descriptor::descriptor_set::SimpleDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<shader::ty::InputData>>>), vulkano::descriptor::descriptor_set::SimpleDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>>)>>,
+    set: std::sync::Arc<vulkano::descriptor::descriptor_set::SimpleDescriptorSet<(((), vulkano::descriptor::descriptor_set::SimpleDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>>), vulkano::descriptor::descriptor_set::SimpleDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>>)>>,
 }
 
 impl<'a> WorkerDevice<'a> {
@@ -29,15 +35,14 @@ impl<'a> WorkerDevice<'a> {
                                                                 &vulkano::device::DeviceExtensions::none(),
                                                                 [(queue, 0.5)].iter().cloned())
             .expect("failed to create device");
+        let max_invocations: usize = 128;
         let queue = queues.next().unwrap();
-        let input_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::<shader::ty::InputData>
-                                   ::from_data(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()), 
-                                    shader::ty::InputData {
-                                        input_vec: [10, 20]
-                                    })
+        let mut rng = OsRng::new().expect("Could not create a safe system random number generator.");
+        let input_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
+                                   (0 .. max_invocations * SECRET_KEY_INT_ARRAY_LENGTH * 4).map(|_| rng.next_u32()))
             .expect("failed to create input buffer");
         let output_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
-                                   (0 .. 65536u32).map(|n| n))
+                                   (0 .. max_invocations).map(|_| 0))
             .expect("failed to create output buffer");
         let shader = shader::Shader::load(&device).expect("Derp.");
         let entry_point = shader.main_entry_point();
@@ -50,6 +55,10 @@ impl<'a> WorkerDevice<'a> {
         WorkerDevice {
             physical_device,
             device,
+            // Hardcoded for now, update with
+            // https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_compute_variable_group_size.txt
+            // or the Vulkan equivalent.
+            max_invocations,
             queue,
             input_buffer,
             output_buffer,
@@ -75,13 +84,32 @@ fn main() {
     devices.par_iter_mut().for_each(|device| {
         {
             let mut buffer_content = device.input_buffer.write().unwrap();
-            buffer_content.input_vec = [buffer_content.input_vec[0] + 1, buffer_content.input_vec[1] + 2];
+
+            buffer_content[0 .. 32].clone_from_slice(&[
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+                0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b,
+                0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36, 0x41, 0x41,
+            ]);
+
+            for x in &mut buffer_content[32 .. 64] { *x = 0xFF; }
+
+            for x in &mut buffer_content[64 .. 96] { *x = 0x00; }
+
+            buffer_content[127] = 0x01;
+            for x in &mut buffer_content[97 .. 128] { *x = 0x00; }
+
+            buffer_content[159] = 0x42;
+            for x in &mut buffer_content[128 .. 160] { *x = 0x00; }
+
+            buffer_content[191] = 0x40;
+            for x in &mut buffer_content[160 .. 192] { *x = 0x00; }
         }
 
         let command_buffer = vulkano::command_buffer::AutoCommandBufferBuilder::new(
             device.device.clone(), device.queue.family()
         ).unwrap().dispatch(
-            [100, 1, 1],  // global workgroup dimensions
+            [device.max_invocations as u32, 1, 1],  // global workgroup dimensions
             device.pipeline.clone(),
             device.set.clone(),
             (),  // push constants
@@ -96,8 +124,12 @@ fn main() {
 
         let output = device.output_buffer.read().expect("could not lock the output buffer");
 
-        for i in 0 .. 3u32 {
-            println!("{:?}", output[i as usize]);
+        for invocation_index in 0 .. device.max_invocations {
+            let array_index = invocation_index;
+            // for secret_key_int_index in 0 .. SECRET_KEY_INT_ARRAY_LENGTH {
+            //     let array_index = invocation_index * SECRET_KEY_INT_ARRAY_LENGTH + secret_key_int_index as usize;
+                println!("{:?}", output[array_index]);
+            // }
         }
     })
 }

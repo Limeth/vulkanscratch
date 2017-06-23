@@ -7,3 +7,4 @@ authors = ["Jakub Hlusička <limeth@protonmail.com>"]
 vulkano = { git = "https://github.com/tomaka/vulkano" }
 vulkano-shader-derive = { git = "https://github.com/tomaka/vulkano" }
 rayon = "0.7.1"
+rand = "0.3.15"

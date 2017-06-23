@@ -3,14 +3,136 @@
 // local workgroup dimensions
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
-layout(set = 0, binding = 0) uniform InputData {
-    uvec2 input_vec;
+layout(set = 0, binding = 0) buffer InputData {
+    uint array[][32];
 } input_data;
 
 layout(set = 0, binding = 1) buffer OutputData {
     uint array[];
 } output_data;
 
+// {{{ secp256k1
+/* Limbs of the secp256k1 order. */
+const uint SECP256K1_N_0 = 0xD0364141;
+const uint SECP256K1_N_1 = 0xBFD25E8C;
+const uint SECP256K1_N_2 = 0xAF48A03B;
+const uint SECP256K1_N_3 = 0xBAAEDCE6;
+const uint SECP256K1_N_4 = 0xFFFFFFFE;
+const uint SECP256K1_N_5 = 0xFFFFFFFF;
+const uint SECP256K1_N_6 = 0xFFFFFFFF;
+const uint SECP256K1_N_7 = 0xFFFFFFFF;
+
+/* Limbs of 2^256 minus the secp256k1 order. */
+const uint SECP256K1_N_C_0 = (~SECP256K1_N_0 + 1);
+const uint SECP256K1_N_C_1 = (~SECP256K1_N_1);
+const uint SECP256K1_N_C_2 = (~SECP256K1_N_2);
+const uint SECP256K1_N_C_3 = (~SECP256K1_N_3);
+const uint SECP256K1_N_C_4 = (1);
+
+/* Limbs of half the secp256k1 order. */
+const uint SECP256K1_N_H_0 = 0x681B20A0;
+const uint SECP256K1_N_H_1 = 0xDFE92F46;
+const uint SECP256K1_N_H_2 = 0x57A4501D;
+const uint SECP256K1_N_H_3 = 0x5D576E73;
+const uint SECP256K1_N_H_4 = 0xFFFFFFFF;
+const uint SECP256K1_N_H_5 = 0xFFFFFFFF;
+const uint SECP256K1_N_H_6 = 0xFFFFFFFF;
+const uint SECP256K1_N_H_7 = 0x7FFFFFFF;
+
+bool secp256k1_scalar_check_overflow(const uint[8] a) {
+    bool yes = false;
+    bool no = false;
+    no  = no  || (a[7] < SECP256K1_N_7); /* No need for a > check. */
+    no  = no  || (a[6] < SECP256K1_N_6); /* No need for a > check. */
+    no  = no  || (a[5] < SECP256K1_N_5); /* No need for a > check. */
+    no  = no  || (a[4] < SECP256K1_N_4);
+    yes = yes || (a[4] > SECP256K1_N_4) && !no;
+    no  = no  || (a[3] < SECP256K1_N_3) && !yes;
+    yes = yes || (a[3] > SECP256K1_N_3) && !no;
+    no  = no  || (a[2] < SECP256K1_N_2) && !yes;
+    yes = yes || (a[2] > SECP256K1_N_2) && !no;
+    no  = no  || (a[1] < SECP256K1_N_1) && !yes;
+    yes = yes || (a[1] > SECP256K1_N_1) && !no;
+    yes = yes || (a[0] >= SECP256K1_N_0) && !no;
+    return yes;
+}
+
+int secp256k1_scalar_reduce(in out uint[8] r, in bool overflow_bool) {
+    int overflow = int(overflow_bool);
+    uint t;
+    /* VERIFY_CHECK(overflow <= 1); */
+    t = r[0] + overflow * SECP256K1_N_C_0;
+    r[0] = t & 0xFFFFFFFF; t >>= 32;
+    t += r[1] + overflow * SECP256K1_N_C_1;
+    r[1] = t & 0xFFFFFFFF; t >>= 32;
+    t += r[2] + overflow * SECP256K1_N_C_2;
+    r[2] = t & 0xFFFFFFFF; t >>= 32;
+    t += r[3] + overflow * SECP256K1_N_C_3;
+    r[3] = t & 0xFFFFFFFF; t >>= 32;
+    t += r[4] + overflow * SECP256K1_N_C_4;
+    r[4] = t & 0xFFFFFFFF; t >>= 32;
+    t += r[5];
+    r[5] = t & 0xFFFFFFFF; t >>= 32;
+    t += r[6];
+    r[6] = t & 0xFFFFFFFF; t >>= 32;
+    t += r[7];
+    r[7] = t & 0xFFFFFFFF;
+    return overflow;
+}
+
+void secp256k1_scalar_set_b32(out uint[8] r, in uint[32] b32, out int overflow) {
+    int over;
+    r[0] = b32[31] | b32[30] << 8 | b32[29] << 16 | b32[28] << 24;
+    r[1] = b32[27] | b32[26] << 8 | b32[25] << 16 | b32[24] << 24;
+    r[2] = b32[23] | b32[22] << 8 | b32[21] << 16 | b32[20] << 24;
+    r[3] = b32[19] | b32[18] << 8 | b32[17] << 16 | b32[16] << 24;
+    r[4] = b32[15] | b32[14] << 8 | b32[13] << 16 | b32[12] << 24;
+    r[5] = b32[11] | b32[10] << 8 | b32[9] << 16 | b32[8] << 24;
+    r[6] = b32[7] | b32[6] << 8 | b32[5] << 16 | b32[4] << 24;
+    r[7] = b32[3] | b32[2] << 8 | b32[1] << 16 | b32[0] << 24;
+    over = secp256k1_scalar_reduce(r, secp256k1_scalar_check_overflow(r));
+    if (overflow != 0) {
+        overflow = over;
+    }
+}
+
+bool secp256k1_scalar_is_zero(in uint[8] a) {
+    return (a[0] | a[1] | a[2] | a[3] | a[4] | a[5] | a[6] | a[7]) == 0;
+}
+
+void secp256k1_scalar_clear(in out uint[8] r) {
+    r[0] = 0;
+    r[1] = 0;
+    r[2] = 0;
+    r[3] = 0;
+    r[4] = 0;
+    r[5] = 0;
+    r[6] = 0;
+    r[7] = 0;
+}
+
+int secp256k1_ec_seckey_verify(in uint[32] seckey) {
+    uint[8] sec;
+    int ret;
+    int overflow;
+    /* VERIFY_CHECK(ctx != NULL); */
+    /* ARG_CHECK(seckey != NULL); */
+    /* (void)ctx; */
+
+    secp256k1_scalar_set_b32(sec, seckey, overflow);
+    ret = int(!bool(overflow) && !secp256k1_scalar_is_zero(sec));
+    secp256k1_scalar_clear(sec);
+    return ret;
+}
+
+int secp256k1_ec_seckey_verify(in uint[8] sec) {
+    int overflow = secp256k1_scalar_reduce(sec, secp256k1_scalar_check_overflow(sec));
+    return int(!bool(overflow) && !bool(secp256k1_scalar_is_zero(sec)));
+}
+// }}}
+
 void main() {
-    output_data.array[gl_GlobalInvocationID.x] = gl_GlobalInvocationID.x % 2;
+    uint[32] seckey = input_data.array[gl_GlobalInvocationID.x];
+
+    output_data.array[gl_GlobalInvocationID.x] = secp256k1_ec_seckey_verify(seckey);
 }

@@ -4,7 +4,7 @@
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 layout(set = 0, binding = 0) buffer InputData {
-    uint array[][32];
+    uint array[][8];
 } input_data;
 
 layout(set = 0, binding = 1) buffer OutputData {
@@ -120,7 +120,7 @@ bool secp256k1_ec_seckey_verify(in uint[8] sec) {
 // }}}
 
 void main() {
-    uint[32] seckey = input_data.array[gl_GlobalInvocationID.x];
+    uint[8] seckey = input_data.array[gl_GlobalInvocationID.x];
 
     output_data.array[gl_GlobalInvocationID.x] =
         int(secp256k1_ec_seckey_verify(seckey));

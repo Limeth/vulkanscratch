@@ -41,7 +41,7 @@ impl<'a> WorkerDevice<'a> {
         let queue = queues.next().unwrap();
         let mut rng = OsRng::new().expect("Could not create a safe system random number generator.");
         let input_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
-                                   (0 .. max_invocations * SECRET_KEY_INT_ARRAY_LENGTH * 4).map(|_| rng.next_u32()))
+                                   (0 .. max_invocations * SECRET_KEY_INT_ARRAY_LENGTH).map(|_| rng.next_u32()))
             .expect("failed to create input buffer");
         let output_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
                                    (0 .. max_invocations).map(|_| 0))
@@ -85,13 +85,14 @@ fn main() {
 
     devices.par_iter_mut().for_each(|device| {
         {
+            // {{{ generate test input
+            let mut buffer_content = [0u32; 192];
             let orderc = [
                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
                 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b,
                 0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36, 0x41, 0x41,
             ];
-            let mut buffer_content = device.input_buffer.write().unwrap();
 
             buffer_content[0 .. 32].clone_from_slice(&orderc);
 
@@ -107,7 +108,9 @@ fn main() {
 
             buffer_content[160 .. 192].clone_from_slice(&orderc);
             buffer_content[191] = 0x40;
+            // }}}
 
+            // {{{ validate input using the original Secp256k1 implementation
             let secp256k1 = secp256k1::Secp256k1::new();
             let expected_results = [ false, false, false, true, false, true ];
 
@@ -115,6 +118,23 @@ fn main() {
                 let u8_buffer: Vec<u8> = buffer_content[i*32 .. (i+1)*32].iter().map(|i| *i as u8).collect();
                 println!("{}: {:?}", expected_result, SecretKey::from_slice(&secp256k1, &u8_buffer))
             }
+            // }}}
+
+            // {{{ convert bytes to u32s
+            let mut input_buffer = device.input_buffer.write().unwrap();
+
+            for x in &mut input_buffer[0 .. 6 * 8] { *x = 0x00; }
+
+            for key in 0 .. 6 {
+                for byte in 0 .. 32 {
+                    let integer = 7 - byte / 4;
+                    let bitshift = (3 - byte % 4) * 8;
+                    let abs_byte = key * 32 + byte;
+                    let abs_integer = key * 8 + integer;
+                    input_buffer[abs_integer] |= buffer_content[abs_byte] << bitshift;
+                }
+            }
+            // }}}
         }
 
         let command_buffer = vulkano::command_buffer::AutoCommandBufferBuilder::new(

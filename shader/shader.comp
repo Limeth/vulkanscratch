@@ -1,17 +1,59 @@
 #version 450
 
-// local workgroup dimensions
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-
-layout(set = 0, binding = 0) buffer InputData {
-    uint array[][8];
-} input_data;
-
-layout(set = 0, binding = 1) buffer OutputData {
-    uint array[];
-} output_data;
-
 // {{{ secp256k1
+
+// {{{ secp256k1 structs
+struct secp256k1_scalar {
+    uint[8] d;
+};
+
+struct secp256k1_fe {
+   uint[10] n;
+// #ifdef VERIFY
+//     int magnitude;
+//     int normalized;
+// #endif
+};
+
+struct secp256k1_gej {
+    secp256k1_fe x;
+    secp256k1_fe y;
+    secp256k1_fe z;
+    int infinity;
+};
+
+struct secp256k1_ge {
+    secp256k1_fe x;
+    secp256k1_fe y;
+    int infinity;
+};
+
+struct secp256k1_fe_storage {
+    uint[8] n;
+};
+
+struct secp256k1_ge_storage {
+    secp256k1_fe_storage x;
+    secp256k1_fe_storage y;
+};
+
+struct secp256k1_ecmult_gen_context {
+    secp256k1_ge_storage[64][16] prec;  // (*prec);
+    secp256k1_scalar blind;
+    secp256k1_gej initial;
+};
+
+// secp256k1_context_struct == secp256k1_context
+struct secp256k1_context_struct {
+    /* secp256k1_ecmult_context ecmult_ctx; */
+    /* secp256k1_ecmult_gen_context ecmult_gen_ctx; */
+    secp256k1_ecmult_gen_context ctx;
+    /* secp256k1_callback illegal_callback; */
+    /* secp256k1_callback error_callback; */
+};
+// }}}
+
+// {{{ secp256k1 constants
 /* Limbs of the secp256k1 order. */
 const uint SECP256K1_N_0 = 0xD0364141;
 const uint SECP256K1_N_1 = 0xBFD25E8C;
@@ -38,7 +80,9 @@ const uint SECP256K1_N_H_4 = 0xFFFFFFFF;
 const uint SECP256K1_N_H_5 = 0xFFFFFFFF;
 const uint SECP256K1_N_H_6 = 0xFFFFFFFF;
 const uint SECP256K1_N_H_7 = 0x7FFFFFFF;
+// }}}
 
+// {{{ secret key verification
 bool secp256k1_scalar_check_overflow(const uint[8] a) {
     bool yes = false;
     bool no = false;
@@ -119,9 +163,106 @@ bool secp256k1_ec_seckey_verify(in uint[8] sec) {
 }
 // }}}
 
+// {{{ public key creation
+int secp256k1_scalar_add(out secp256k1_scalar r, in secp256k1_scalar a, in secp256k1_scalar b) {
+    int overflow;
+    uint t = a.d[0] + b.d[0];
+    r.d[0] = t & 0xFFFFFFFF; t >>= 32;
+    t += a.d[1] + b.d[1];
+    r.d[1] = t & 0xFFFFFFFF; t >>= 32;
+    t += a.d[2] + b.d[2];
+    r.d[2] = t & 0xFFFFFFFF; t >>= 32;
+    t += a.d[3] + b.d[3];
+    r.d[3] = t & 0xFFFFFFFF; t >>= 32;
+    t += a.d[4] + b.d[4];
+    r.d[4] = t & 0xFFFFFFFF; t >>= 32;
+    t += a.d[5] + b.d[5];
+    r.d[5] = t & 0xFFFFFFFF; t >>= 32;
+    t += a.d[6] + b.d[6];
+    r.d[6] = t & 0xFFFFFFFF; t >>= 32;
+    t += a.d[7] + b.d[7];
+    r.d[7] = t & 0xFFFFFFFF; t >>= 32;
+    overflow = t + secp256k1_scalar_check_overflow(r);
+    VERIFY_CHECK(overflow == 0 || overflow == 1);
+    secp256k1_scalar_reduce(r, overflow);
+    return overflow;
+}
+
+void secp256k1_ecmult_gen(in secp256k1_ecmult_gen_context ctx, out secp256k1_gej r, in secp256k1_scalar gn) {
+    secp256k1_ge add;
+    secp256k1_ge_storage adds;
+    secp256k1_scalar gnb;
+    int bits;
+    int i, j;
+    /* memset(&adds, 0, sizeof(adds)); */
+    /* *r = ctx->initial; */
+    secp256k1_gej r = ctx.initial;
+    /* Blind scalar/point multiplication by computing (n-b)G + bG instead of nG. */
+    secp256k1_scalar_add(gnb, gn, ctx.blind);
+    add.infinity = 0;
+    for (j = 0; j < 64; j++) {
+        bits = secp256k1_scalar_get_bits(&gnb, j * 4, 4);
+        for (i = 0; i < 16; i++) {
+            /** This uses a conditional move to avoid any secret data in array indexes.
+             *   _Any_ use of secret indexes has been demonstrated to result in timing
+             *   sidechannels, even when the cache-line access patterns are uniform.
+             *  See also:
+             *   "A word of warning", CHES 2013 Rump Session, by Daniel J. Bernstein and Peter Schwabe
+             *    (https://cryptojedi.org/peter/data/chesrump-20130822.pdf) and
+             *   "Cache Attacks and Countermeasures: the Case of AES", RSA 2006,
+             *    by Dag Arne Osvik, Adi Shamir, and Eran Tromer
+             *    (http://www.tau.ac.il/~tromer/papers/cache.pdf)
+             */
+            secp256k1_ge_storage_cmov(&adds, &(*ctx->prec)[j][i], i == bits);
+        }
+        secp256k1_ge_from_storage(&add, &adds);
+        secp256k1_gej_add_ge(r, r, &add);
+    }
+    bits = 0;
+    secp256k1_ge_clear(&add);
+    secp256k1_scalar_clear(&gnb);
+}
+
+// removed secret key checks, make sure to enter valid secret keys.
+void secp256k1_ec_pubkey_create(in secp256k1_ecmult_gen_context ctx, in out uint[8] pubkey, in uint[8] seckey) {
+    secp256k1_gej pj;
+    secp256k1_ge p;
+    /* pubkey = {0, 0, 0, 0, 0, 0, 0, 0}; */
+
+    secp256k1_ecmult_gen(ctx.ecmult_gen_ctx, pj, seckey);
+    /* secp256k1_ge_set_gej(p, pj); */
+    /* secp256k1_pubkey_save(pubkey, p); */
+}
+// }}}
+
+// }}}
+
+// local workgroup dimensions
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform Context {
+    secp256k1_context_struct context;
+} context_buffer;
+
+layout(set = 0, binding = 1) buffer InputData {
+    uint array[][8];
+} input_data;
+
+layout(set = 0, binding = 2) buffer OutputData {
+    uint array[];
+} output_data;
+
 void main() {
     uint[8] seckey = input_data.array[gl_GlobalInvocationID.x];
 
-    output_data.array[gl_GlobalInvocationID.x] =
-        int(secp256k1_ec_seckey_verify(seckey));
+    if(!secp256k1_ec_seckey_verify(seckey)) {
+        output_data.array[gl_GlobalInvocationID.x] = 0;
+        return;
+    }
+
+    output_data.array[gl_GlobalInvocationID.x] = 1;
+    uint[8] pubkey;
+
+    // We assume success as we already checked the validity of the secret key.
+    secp256k1_ec_pubkey_create(context_buffer.context.ctx, pubkey, seckey);
 }

@@ -4,16 +4,21 @@ extern crate vulkano;
 extern crate vulkano_shader_derive;
 extern crate rayon;
 extern crate rand;
-extern crate secp256k1;  // TODO for testing, remove
+extern crate secp256k1;
+
+mod context;
 
 use rayon::prelude::*;
 use std::sync::Arc;
+use std::rc::Rc;
 use vulkano::command_buffer::{CommandBuffer, CommandBufferBuilder};
 use vulkano::image::traits::Image;
 use vulkano::sync::GpuFuture;
 use rand::os::OsRng;
 use rand::Rng;
+use secp256k1::{Secp256k1, ContextFlag};
 use secp256k1::key::SecretKey;
+use context::Secp256k1Context;
 
 const SECRET_KEY_INT_ARRAY_LENGTH: usize = 8;
 
@@ -29,7 +34,7 @@ struct WorkerDevice<'a> {
 }
 
 impl<'a> WorkerDevice<'a> {
-    fn new(physical_device: vulkano::instance::PhysicalDevice<'a>) -> Self {
+    fn new(physical_device: vulkano::instance::PhysicalDevice<'a>, secp256k1_context: Rc<Secp256k1Context>) -> Self {
         // possibly filter out the queue with required features
         let queue = physical_device.queue_families().next().expect("Could not find any queue.");
         let (device, mut queues) = vulkano::device::Device::new(&physical_device,
@@ -39,6 +44,14 @@ impl<'a> WorkerDevice<'a> {
             .expect("failed to create device");
         let max_invocations: usize = 128;
         let queue = queues.next().unwrap();
+        let context_buffer = vulkano::buffer::immutable::ImmutableBuffer::from_data(
+            shader::ty::Context {
+                context: secp256k1_context.as_ref().into(),
+            },
+            vulkano::buffer::BufferUsage::uniform_buffer(),
+            Some(queue.family()),
+            queue.clone(),
+        ).expect("failed to create input buffer");
         let mut rng = OsRng::new().expect("Could not create a safe system random number generator.");
         let input_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
                                    (0 .. max_invocations * SECRET_KEY_INT_ARRAY_LENGTH).map(|_| rng.next_u32()))
@@ -78,15 +91,18 @@ fn main() {
         None
     ).expect("Could not create a Vulkano instance.");
     let mut devices: Vec<WorkerDevice> = Vec::new();
+    let secp256k1_context = Rc::new(Secp256k1Context::with_caps(ContextFlag::Full));
 
     for physical_device in vulkano::instance::PhysicalDevice::enumerate(&instance) {
-        devices.push(WorkerDevice::new(physical_device));
+        devices.push(WorkerDevice::new(physical_device, secp256k1_context.clone()));
     }
+
+    let secp256k1 = Secp256k1::with_caps(ContextFlag::Full);
 
     devices.par_iter_mut().for_each(|device| {
         {
             // {{{ generate test input
-            let mut buffer_content = [0u32; 192];
+            let mut buffer_content = [0u8; 192];
             let orderc = [
                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
@@ -111,12 +127,11 @@ fn main() {
             // }}}
 
             // {{{ validate input using the original Secp256k1 implementation
-            let secp256k1 = secp256k1::Secp256k1::new();
             let expected_results = [ false, false, false, true, false, true ];
 
             for (i, expected_result) in expected_results.iter().enumerate() {
-                let u8_buffer: Vec<u8> = buffer_content[i*32 .. (i+1)*32].iter().map(|i| *i as u8).collect();
-                println!("{}: {:?}", expected_result, SecretKey::from_slice(&secp256k1, &u8_buffer))
+                // let u8_buffer: Vec<u8> = buffer_content[i*32 .. (i+1)*32].iter().map(|i| *i as u8).collect();
+                println!("{}: {:?}", expected_result, SecretKey::from_slice(&secp256k1, &buffer_content))
             }
             // }}}
 
@@ -131,7 +146,7 @@ fn main() {
                     let bitshift = (3 - byte % 4) * 8;
                     let abs_byte = key * 32 + byte;
                     let abs_integer = key * 8 + integer;
-                    input_buffer[abs_integer] |= buffer_content[abs_byte] << bitshift;
+                    input_buffer[abs_integer] |= (buffer_content[abs_byte] as u32) << bitshift;
                 }
             }
             // }}}

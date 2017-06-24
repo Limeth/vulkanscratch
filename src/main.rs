@@ -4,6 +4,7 @@ extern crate vulkano;
 extern crate vulkano_shader_derive;
 extern crate rayon;
 extern crate rand;
+extern crate secp256k1;  // TODO for testing, remove
 
 use rayon::prelude::*;
 use std::sync::Arc;
@@ -12,6 +13,7 @@ use vulkano::image::traits::Image;
 use vulkano::sync::GpuFuture;
 use rand::os::OsRng;
 use rand::Rng;
+use secp256k1::key::SecretKey;
 
 const SECRET_KEY_INT_ARRAY_LENGTH: usize = 8;
 
@@ -83,27 +85,36 @@ fn main() {
 
     devices.par_iter_mut().for_each(|device| {
         {
-            let mut buffer_content = device.input_buffer.write().unwrap();
-
-            buffer_content[0 .. 32].clone_from_slice(&[
+            let orderc = [
                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
                 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b,
                 0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36, 0x41, 0x41,
-            ]);
+            ];
+            let mut buffer_content = device.input_buffer.write().unwrap();
+
+            buffer_content[0 .. 32].clone_from_slice(&orderc);
 
             for x in &mut buffer_content[32 .. 64] { *x = 0xFF; }
 
             for x in &mut buffer_content[64 .. 96] { *x = 0x00; }
 
+            for x in &mut buffer_content[96 .. 128] { *x = 0x00; }
             buffer_content[127] = 0x01;
-            for x in &mut buffer_content[97 .. 128] { *x = 0x00; }
 
+            buffer_content[128 .. 160].clone_from_slice(&orderc);
             buffer_content[159] = 0x42;
-            for x in &mut buffer_content[128 .. 160] { *x = 0x00; }
 
+            buffer_content[160 .. 192].clone_from_slice(&orderc);
             buffer_content[191] = 0x40;
-            for x in &mut buffer_content[160 .. 192] { *x = 0x00; }
+
+            let secp256k1 = secp256k1::Secp256k1::new();
+            let expected_results = [ false, false, false, true, false, true ];
+
+            for (i, expected_result) in expected_results.iter().enumerate() {
+                let u8_buffer: Vec<u8> = buffer_content[i*32 .. (i+1)*32].iter().map(|i| *i as u8).collect();
+                println!("{}: {:?}", expected_result, SecretKey::from_slice(&secp256k1, &u8_buffer))
+            }
         }
 
         let command_buffer = vulkano::command_buffer::AutoCommandBufferBuilder::new(

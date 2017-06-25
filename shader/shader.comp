@@ -25,10 +25,6 @@ struct secp256k1_scalar {
 
 struct secp256k1_fe {
    uint[10] n;
-// #ifdef VERIFY
-//     int magnitude;
-//     int normalized;
-// #endif
 };
 
 struct secp256k1_gej {
@@ -120,7 +116,6 @@ bool secp256k1_scalar_check_overflow(in const secp256k1_scalar a) {
 int secp256k1_scalar_reduce(in out secp256k1_scalar r, in bool overflow_bool) {
     int overflow = int(overflow_bool);
     uint t;
-    /* VERIFY_CHECK(overflow <= 1); */
     t = r.d[0] + overflow * SECP256K1_N_C_0;
     r.d[0] = t & 0xFFFFFFFF; t >>= 32;
     t += r.d[1] + overflow * SECP256K1_N_C_1;
@@ -198,15 +193,12 @@ int secp256k1_scalar_add(out secp256k1_scalar r, in secp256k1_scalar a, in secp2
     r.d[6] = t & 0xFFFFFFFF; t >>= 32;
     t += a.d[7] + b.d[7];
     r.d[7] = t & 0xFFFFFFFF; t >>= 32;
-/* bool secp256k1_scalar_check_overflow(const uint[8] a) { */
     overflow = int(t) + int(secp256k1_scalar_check_overflow(r));
-    /* VERIFY_CHECK(overflow == 0 || overflow == 1); */
     secp256k1_scalar_reduce(r, bool(overflow));
     return overflow;
 }
 
 uint secp256k1_scalar_get_bits(in const secp256k1_scalar a, in const uint offset, in const uint count) {
-    /* VERIFY_CHECK((offset + count - 1) >> 5 == offset >> 5); */
     return (a.d[offset >> 5] >> (offset & 0x1F)) & ((1 << count) - 1);
 }
 
@@ -248,10 +240,6 @@ void secp256k1_fe_from_storage(in out secp256k1_fe r, in const secp256k1_fe_stor
     r.n[7] = a.n[5] >> 22 | ((a.n[6] << 10) & 0x3FFFFFF);
     r.n[8] = a.n[6] >> 16 | ((a.n[7] << 16) & 0x3FFFFFF);
     r.n[9] = a.n[7] >> 10;
-/* #ifdef VERIFY */
-/*     r->magnitude = 1; */
-/*     r->normalized = 1; */
-/* #endif */
 }
 
 void secp256k1_ge_from_storage(in out secp256k1_ge r, in const secp256k1_ge_storage a) {
@@ -263,11 +251,6 @@ void secp256k1_ge_from_storage(in out secp256k1_ge r, in const secp256k1_ge_stor
 void secp256k1_fe_set_int(in out secp256k1_fe r, in const int a) {
     r.n[0] = a;
     r.n[1] = r.n[2] = r.n[3] = r.n[4] = r.n[5] = r.n[6] = r.n[7] = r.n[8] = r.n[9] = 0;
-/* #ifdef VERIFY */
-/*     r->magnitude = 1; */
-/*     r->normalized = 1; */
-/*     secp256k1_fe_verify(r); */
-/* #endif */
 }
 
 void secp256k1_gej_set_ge(in out secp256k1_gej r, in const secp256k1_ge a) {
@@ -433,16 +416,186 @@ void secp256k1_fe_sqr_inner(in out uint[10] r, in const uint[10] a) {
 }
 
 void secp256k1_fe_sqr(in out secp256k1_fe r, in const secp256k1_fe a) {
-/* #ifdef VERIFY */
-/*     VERIFY_CHECK(a->magnitude <= 8); */
-/*     secp256k1_fe_verify(a); */
-/* #endif */
     secp256k1_fe_sqr_inner(r.n, a.n);
-/* #ifdef VERIFY */
-/*     r->magnitude = 1; */
-/*     r->normalized = 0; */
-/*     secp256k1_fe_verify(r); */
-/* #endif */
+}
+
+void secp256k1_fe_normalize_weak(in out secp256k1_fe r) {
+    uint t0 = r.n[0], t1 = r.n[1], t2 = r.n[2], t3 = r.n[3], t4 = r.n[4],
+             t5 = r.n[5], t6 = r.n[6], t7 = r.n[7], t8 = r.n[8], t9 = r.n[9];
+
+    /* Reduce t9 at the start so there will be at most a single carry from the first pass */
+    uint x = t9 >> 22; t9 &= 0x03FFFFF;
+
+    /* The first pass ensures the magnitude is 1, ... */
+    t0 += x * 0x3D1; t1 += (x << 6);
+    t1 += (t0 >> 26); t0 &= 0x3FFFFFF;
+    t2 += (t1 >> 26); t1 &= 0x3FFFFFF;
+    t3 += (t2 >> 26); t2 &= 0x3FFFFFF;
+    t4 += (t3 >> 26); t3 &= 0x3FFFFFF;
+    t5 += (t4 >> 26); t4 &= 0x3FFFFFF;
+    t6 += (t5 >> 26); t5 &= 0x3FFFFFF;
+    t7 += (t6 >> 26); t6 &= 0x3FFFFFF;
+    t8 += (t7 >> 26); t7 &= 0x3FFFFFF;
+    t9 += (t8 >> 26); t8 &= 0x3FFFFFF;
+
+    r.n[0] = t0; r.n[1] = t1; r.n[2] = t2; r.n[3] = t3; r.n[4] = t4;
+    r.n[5] = t5; r.n[6] = t6; r.n[7] = t7; r.n[8] = t8; r.n[9] = t9;
+}
+
+void secp256k1_fe_mul_inner(in out uint[10] r, in const uint[10] a, in const uint[10] b) {
+    uint64_t c, d;
+    uint64_t u0, u1, u2, u3, u4, u5, u6, u7, u8;
+    uint t9, t1, t0, t2, t3, t4, t5, t6, t7;
+    const uint64_t M = 0x3FFFFFF, R0 = 0x3D10, R1 = 0x400;
+
+    d  = uint64_t(a[0]) * b[9]
+       + uint64_t(a[1]) * b[8]
+       + uint64_t(a[2]) * b[7]
+       + uint64_t(a[3]) * b[6]
+       + uint64_t(a[4]) * b[5]
+       + uint64_t(a[5]) * b[4]
+       + uint64_t(a[6]) * b[3]
+       + uint64_t(a[7]) * b[2]
+       + uint64_t(a[8]) * b[1]
+       + uint64_t(a[9]) * b[0];
+    t9 = uint(d & M); d >>= 26;
+
+    c  = uint64_t(a[0]) * b[0];
+    d += uint64_t(a[1]) * b[9]
+       + uint64_t(a[2]) * b[8]
+       + uint64_t(a[3]) * b[7]
+       + uint64_t(a[4]) * b[6]
+       + uint64_t(a[5]) * b[5]
+       + uint64_t(a[6]) * b[4]
+       + uint64_t(a[7]) * b[3]
+       + uint64_t(a[8]) * b[2]
+       + uint64_t(a[9]) * b[1];
+    u0 = uint(d & M); d >>= 26; c += u0 * R0;
+    t0 = uint(c & M); c >>= 26; c += u0 * R1;
+
+    c += uint64_t(a[0]) * b[1]
+       + uint64_t(a[1]) * b[0];
+    d += uint64_t(a[2]) * b[9]
+       + uint64_t(a[3]) * b[8]
+       + uint64_t(a[4]) * b[7]
+       + uint64_t(a[5]) * b[6]
+       + uint64_t(a[6]) * b[5]
+       + uint64_t(a[7]) * b[4]
+       + uint64_t(a[8]) * b[3]
+       + uint64_t(a[9]) * b[2];
+    u1 = uint(d & M); d >>= 26; c += u1 * R0;
+    t1 = uint(c & M); c >>= 26; c += u1 * R1;
+
+    c += uint64_t(a[0]) * b[2]
+       + uint64_t(a[1]) * b[1]
+       + uint64_t(a[2]) * b[0];
+    d += uint64_t(a[3]) * b[9]
+       + uint64_t(a[4]) * b[8]
+       + uint64_t(a[5]) * b[7]
+       + uint64_t(a[6]) * b[6]
+       + uint64_t(a[7]) * b[5]
+       + uint64_t(a[8]) * b[4]
+       + uint64_t(a[9]) * b[3];
+    u2 = uint(d & M); d >>= 26; c += u2 * R0;
+    t2 = uint(c & M); c >>= 26; c += u2 * R1;
+
+    c += uint64_t(a[0]) * b[3]
+       + uint64_t(a[1]) * b[2]
+       + uint64_t(a[2]) * b[1]
+       + uint64_t(a[3]) * b[0];
+    d += uint64_t(a[4]) * b[9]
+       + uint64_t(a[5]) * b[8]
+       + uint64_t(a[6]) * b[7]
+       + uint64_t(a[7]) * b[6]
+       + uint64_t(a[8]) * b[5]
+       + uint64_t(a[9]) * b[4];
+    u3 = uint(d & M); d >>= 26; c += u3 * R0;
+    t3 = uint(c & M); c >>= 26; c += u3 * R1;
+
+    c += uint64_t(a[0]) * b[4]
+       + uint64_t(a[1]) * b[3]
+       + uint64_t(a[2]) * b[2]
+       + uint64_t(a[3]) * b[1]
+       + uint64_t(a[4]) * b[0];
+    d += uint64_t(a[5]) * b[9]
+       + uint64_t(a[6]) * b[8]
+       + uint64_t(a[7]) * b[7]
+       + uint64_t(a[8]) * b[6]
+       + uint64_t(a[9]) * b[5];
+    u4 = uint(d & M); d >>= 26; c += u4 * R0;
+    t4 = uint(c & M); c >>= 26; c += u4 * R1;
+
+    c += uint64_t(a[0]) * b[5]
+       + uint64_t(a[1]) * b[4]
+       + uint64_t(a[2]) * b[3]
+       + uint64_t(a[3]) * b[2]
+       + uint64_t(a[4]) * b[1]
+       + uint64_t(a[5]) * b[0];
+    d += uint64_t(a[6]) * b[9]
+       + uint64_t(a[7]) * b[8]
+       + uint64_t(a[8]) * b[7]
+       + uint64_t(a[9]) * b[6];
+    u5 = uint(d & M); d >>= 26; c += u5 * R0;
+    t5 = uint(c & M); c >>= 26; c += u5 * R1;
+
+    c += uint64_t(a[0]) * b[6]
+       + uint64_t(a[1]) * b[5]
+       + uint64_t(a[2]) * b[4]
+       + uint64_t(a[3]) * b[3]
+       + uint64_t(a[4]) * b[2]
+       + uint64_t(a[5]) * b[1]
+       + uint64_t(a[6]) * b[0];
+    d += uint64_t(a[7]) * b[9]
+       + uint64_t(a[8]) * b[8]
+       + uint64_t(a[9]) * b[7];
+    u6 = uint(d & M); d >>= 26; c += u6 * R0;
+    t6 = uint(c & M); c >>= 26; c += u6 * R1;
+
+    c += uint64_t(a[0]) * b[7]
+       + uint64_t(a[1]) * b[6]
+       + uint64_t(a[2]) * b[5]
+       + uint64_t(a[3]) * b[4]
+       + uint64_t(a[4]) * b[3]
+       + uint64_t(a[5]) * b[2]
+       + uint64_t(a[6]) * b[1]
+       + uint64_t(a[7]) * b[0];
+    d += uint64_t(a[8]) * b[9]
+       + uint64_t(a[9]) * b[8];
+    u7 = uint(d & M); d >>= 26; c += u7 * R0;
+    t7 = uint(c & M); c >>= 26; c += u7 * R1;
+
+    c += uint64_t(a[0]) * b[8]
+       + uint64_t(a[1]) * b[7]
+       + uint64_t(a[2]) * b[6]
+       + uint64_t(a[3]) * b[5]
+       + uint64_t(a[4]) * b[4]
+       + uint64_t(a[5]) * b[3]
+       + uint64_t(a[6]) * b[2]
+       + uint64_t(a[7]) * b[1]
+       + uint64_t(a[8]) * b[0];
+    d += uint64_t(a[9]) * b[9];
+    u8 = uint(d & M); d >>= 26; c += u8 * R0;
+
+    r[3] = t3;
+    r[4] = t4;
+    r[5] = t5;
+    r[6] = t6;
+    r[7] = t7;
+
+    r[8] = uint(c & M); c >>= 26; c += u8 * R1;
+    c   += d * R0 + t9;
+    r[9] = uint(c & (M >> 4)); c >>= 22; c += d * (R1 << 4);
+
+    d    = c * (R0 >> 4) + t0;
+    r[0] = uint(d & M); d >>= 26;
+    d   += c * (R1 >> 4) + t1;
+    r[1] = uint(d & M); d >>= 26;
+    d   += t2;
+    r[2] = uint(d);
+}
+
+void secp256k1_fe_mul(in out secp256k1_fe r, in const secp256k1_fe a, in const secp256k1_fe b) {
+    secp256k1_fe_mul_inner(r.n, a.n, b.n);
 }
 
 void secp256k1_gej_add_ge(in out secp256k1_gej r, in const secp256k1_gej a, in const secp256k1_ge b) {
@@ -451,8 +604,6 @@ void secp256k1_gej_add_ge(in out secp256k1_gej r, in const secp256k1_gej a, in c
     secp256k1_fe zz, u1, u2, s1, s2, t, tt, m, n, q, rr;
     secp256k1_fe m_alt, rr_alt;
     int infinity, degenerate;
-    /* VERIFY_CHECK(!b.infinity); */
-    /* VERIFY_CHECK(a.infinity == 0 || a.infinity == 1); */
 
     secp256k1_fe_sqr(zz, a.z);                       /* z = Z1^2 */
     u1 = a.x; secp256k1_fe_normalize_weak(u1);        /* u1 = U1 = X1*Z2^2 (1) */

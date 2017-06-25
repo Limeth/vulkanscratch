@@ -598,12 +598,98 @@ void secp256k1_fe_mul(in out secp256k1_fe r, in const secp256k1_fe a, in const s
     secp256k1_fe_mul_inner(r.n, a.n, b.n);
 }
 
+void secp256k1_fe_add(in out secp256k1_fe r, in const secp256k1_fe a) {
+    r.n[0] += a.n[0];
+    r.n[1] += a.n[1];
+    r.n[2] += a.n[2];
+    r.n[3] += a.n[3];
+    r.n[4] += a.n[4];
+    r.n[5] += a.n[5];
+    r.n[6] += a.n[6];
+    r.n[7] += a.n[7];
+    r.n[8] += a.n[8];
+    r.n[9] += a.n[9];
+}
+
+void secp256k1_fe_negate(in out secp256k1_fe r, in const secp256k1_fe a, int m) {
+    r.n[0] = 0x3FFFC2F * 2 * (m + 1) - a.n[0];
+    r.n[1] = 0x3FFFFBF * 2 * (m + 1) - a.n[1];
+    r.n[2] = 0x3FFFFFF * 2 * (m + 1) - a.n[2];
+    r.n[3] = 0x3FFFFFF * 2 * (m + 1) - a.n[3];
+    r.n[4] = 0x3FFFFFF * 2 * (m + 1) - a.n[4];
+    r.n[5] = 0x3FFFFFF * 2 * (m + 1) - a.n[5];
+    r.n[6] = 0x3FFFFFF * 2 * (m + 1) - a.n[6];
+    r.n[7] = 0x3FFFFFF * 2 * (m + 1) - a.n[7];
+    r.n[8] = 0x3FFFFFF * 2 * (m + 1) - a.n[8];
+    r.n[9] = 0x03FFFFF * 2 * (m + 1) - a.n[9];
+}
+
+bool secp256k1_fe_normalizes_to_zero(in out secp256k1_fe r) {
+    uint t0 = r.n[0], t1 = r.n[1], t2 = r.n[2], t3 = r.n[3], t4 = r.n[4],
+             t5 = r.n[5], t6 = r.n[6], t7 = r.n[7], t8 = r.n[8], t9 = r.n[9];
+
+    /* z0 tracks a possible raw value of 0, z1 tracks a possible raw value of P */
+    uint z0, z1;
+
+    /* Reduce t9 at the start so there will be at most a single carry from the first pass */
+    uint x = t9 >> 22; t9 &= 0x03FFFFF;
+
+    /* The first pass ensures the magnitude is 1, ... */
+    t0 += x * 0x3D1; t1 += (x << 6);
+    t1 += (t0 >> 26); t0 &= 0x3FFFFFF; z0  = t0; z1  = t0 ^ 0x3D0;
+    t2 += (t1 >> 26); t1 &= 0x3FFFFFF; z0 |= t1; z1 &= t1 ^ 0x40;
+    t3 += (t2 >> 26); t2 &= 0x3FFFFFF; z0 |= t2; z1 &= t2;
+    t4 += (t3 >> 26); t3 &= 0x3FFFFFF; z0 |= t3; z1 &= t3;
+    t5 += (t4 >> 26); t4 &= 0x3FFFFFF; z0 |= t4; z1 &= t4;
+    t6 += (t5 >> 26); t5 &= 0x3FFFFFF; z0 |= t5; z1 &= t5;
+    t7 += (t6 >> 26); t6 &= 0x3FFFFFF; z0 |= t6; z1 &= t6;
+    t8 += (t7 >> 26); t7 &= 0x3FFFFFF; z0 |= t7; z1 &= t7;
+    t9 += (t8 >> 26); t8 &= 0x3FFFFFF; z0 |= t8; z1 &= t8;
+                                         z0 |= t9; z1 &= t9 ^ 0x3C00000;
+
+    return (z0 == 0) || (z1 == 0x3FFFFFF);
+}
+
+void secp256k1_fe_mul_int(in out secp256k1_fe r, in int a) {
+    r.n[0] *= a;
+    r.n[1] *= a;
+    r.n[2] *= a;
+    r.n[3] *= a;
+    r.n[4] *= a;
+    r.n[5] *= a;
+    r.n[6] *= a;
+    r.n[7] *= a;
+    r.n[8] *= a;
+    r.n[9] *= a;
+}
+
+void secp256k1_fe_cmov(in out secp256k1_fe r, in const secp256k1_fe a, int flag) {
+    uint mask0, mask1;
+    mask0 = flag + ~0;
+    mask1 = ~mask0;
+    r.n[0] = (r.n[0] & mask0) | (a.n[0] & mask1);
+    r.n[1] = (r.n[1] & mask0) | (a.n[1] & mask1);
+    r.n[2] = (r.n[2] & mask0) | (a.n[2] & mask1);
+    r.n[3] = (r.n[3] & mask0) | (a.n[3] & mask1);
+    r.n[4] = (r.n[4] & mask0) | (a.n[4] & mask1);
+    r.n[5] = (r.n[5] & mask0) | (a.n[5] & mask1);
+    r.n[6] = (r.n[6] & mask0) | (a.n[6] & mask1);
+    r.n[7] = (r.n[7] & mask0) | (a.n[7] & mask1);
+    r.n[8] = (r.n[8] & mask0) | (a.n[8] & mask1);
+    r.n[9] = (r.n[9] & mask0) | (a.n[9] & mask1);
+}
+
+void secp256k1_fe_cmov(in out secp256k1_fe r, in const secp256k1_fe a, bool flag) {
+    secp256k1_fe_cmov(r, a, int(flag));
+}
+
 void secp256k1_gej_add_ge(in out secp256k1_gej r, in const secp256k1_gej a, in const secp256k1_ge b) {
     /* Operations: 7 mul, 5 sqr, 4 normalize, 21 mul_int/add/negate/cmov */
     const secp256k1_fe fe_1 = SECP256K1_FE_CONST(0, 0, 0, 0, 0, 0, 0, 1);
     secp256k1_fe zz, u1, u2, s1, s2, t, tt, m, n, q, rr;
     secp256k1_fe m_alt, rr_alt;
-    int infinity, degenerate;
+    int infinity;
+    bool degenerate;
 
     secp256k1_fe_sqr(zz, a.z);                       /* z = Z1^2 */
     u1 = a.x; secp256k1_fe_normalize_weak(u1);        /* u1 = U1 = X1*Z2^2 (1) */
@@ -619,7 +705,7 @@ void secp256k1_gej_add_ge(in out secp256k1_gej r, in const secp256k1_gej a, in c
     secp256k1_fe_add(rr, tt);                         /* rr = R = T^2-U1*U2 (3) */
     /** If lambda = R/M = 0/0 we have a problem (except in the "trivial"
      *  case that Z = z1z2 = 0, and this is special-cased later on). */
-    degenerate = secp256k1_fe_normalizes_to_zero(m) &
+    degenerate = secp256k1_fe_normalizes_to_zero(m) &&
                  secp256k1_fe_normalizes_to_zero(rr);
     /* This only occurs when y1 == -y2 and x1^3 == x2^3, but x1 != x2.
      * This means either x1 == beta*x2 or beta*x1 == x2, where beta is
@@ -646,7 +732,7 @@ void secp256k1_gej_add_ge(in out secp256k1_gej r, in const secp256k1_gej a, in c
     secp256k1_fe_cmov(n, m, degenerate);              /* n = M^3 * Malt (2) */
     secp256k1_fe_sqr(t, rr_alt);                      /* t = Ralt^2 (1) */
     secp256k1_fe_mul(r.z, a.z, m_alt);             /* r->z = Malt*Z (1) */
-    infinity = secp256k1_fe_normalizes_to_zero(r.z) * (1 - a.infinity);
+    infinity = int(secp256k1_fe_normalizes_to_zero(r.z)) * (1 - int(a.infinity));
     secp256k1_fe_mul_int(r.z, 2);                     /* r->z = Z3 = 2*Malt*Z (2) */
     secp256k1_fe_negate(q, q, 1);                     /* q = -Q (2) */
     secp256k1_fe_add(t, q);                           /* t = Ralt^2-Q (3) */
@@ -695,12 +781,15 @@ void secp256k1_ecmult_gen(in secp256k1_ecmult_gen_context ctx, out secp256k1_gej
 }
 
 // removed secret key checks, make sure to enter valid secret keys.
-void secp256k1_ec_pubkey_create(in secp256k1_ecmult_gen_context ctx, in out uint[8] pubkey, in uint[8] seckey) {
+void secp256k1_ec_pubkey_create(
+        in secp256k1_ecmult_gen_context ctx,
+        in out secp256k1_scalar pubkey,
+        in const secp256k1_scalar seckey) {
     secp256k1_gej pj;
     secp256k1_ge p;
     /* pubkey = {0, 0, 0, 0, 0, 0, 0, 0}; */
 
-    secp256k1_ecmult_gen(ctx.ecmult_gen_ctx, pj, seckey);
+    secp256k1_ecmult_gen(ctx, pj, seckey);
     /* secp256k1_ge_set_gej(p, pj); */
     /* secp256k1_pubkey_save(pubkey, p); */
 }
@@ -724,7 +813,7 @@ layout(set = 0, binding = 2) buffer OutputData {
 } output_data;
 
 void main() {
-    uint[8] seckey = input_data.array[gl_GlobalInvocationID.x];
+    secp256k1_scalar seckey = secp256k1_scalar(input_data.array[gl_GlobalInvocationID.x]);
 
     if(!secp256k1_ec_seckey_verify(seckey)) {
         output_data.array[gl_GlobalInvocationID.x] = 0;
@@ -732,7 +821,7 @@ void main() {
     }
 
     output_data.array[gl_GlobalInvocationID.x] = 1;
-    uint[8] pubkey;
+    secp256k1_scalar pubkey;
 
     // We assume success as we already checked the validity of the secret key.
     secp256k1_ec_pubkey_create(context_buffer.context.ctx, pubkey, seckey);

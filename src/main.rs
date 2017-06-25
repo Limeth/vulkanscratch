@@ -86,11 +86,41 @@ impl<'a> WorkerDevice<'a> {
 
 fn main() {
     let application_info = vulkano::instance::ApplicationInfo::from_cargo_toml();
+    let extensions = vulkano::instance::InstanceExtensions {
+        ext_debug_report: true,  // TODO: remove debug mode
+        ..vulkano::instance::InstanceExtensions::none()
+    };
+    let layer = "VK_LAYER_LUNARG_standard_validation";
+    let layers = vec!(&layer);
     let instance = vulkano::instance::Instance::new(
         Some(&application_info),
-        &vulkano::instance::InstanceExtensions::supported_by_core().expect("Could not retrieve available instance extensions."),
-        None
+        &extensions,
+        layers,
     ).expect("Could not create a Vulkano instance.");
+    let all = vulkano::instance::debug::MessageTypes {
+        error: true,
+        warning: true,
+        performance_warning: true,
+        information: true,
+        debug: true,
+    };
+
+    let _debug_callback = vulkano::instance::debug::DebugCallback::new(&instance, all, |msg| {
+        let ty = if msg.ty.error {
+            "error"
+        } else if msg.ty.warning {
+            "warning"
+        } else if msg.ty.performance_warning {
+            "performance_warning"
+        } else if msg.ty.information {
+            "information"
+        } else if msg.ty.debug {
+            "debug"
+        } else {
+            panic!("no-impl");
+        };
+        println!("{} {}: {}", msg.layer_prefix, ty, msg.description);
+    }).ok();
     let mut devices: Vec<WorkerDevice> = Vec::new();
     let secp256k1_context = Rc::new(Secp256k1Context::with_caps(ContextFlag::Full));
 

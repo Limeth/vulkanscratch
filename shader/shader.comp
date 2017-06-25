@@ -335,34 +335,34 @@ void secp256k1_gej_set_ge(in out secp256k1_gej r, in const secp256k1_ge a) {
 /*     secp256k1_fe_add(r.y, h3); */
 /* } */
 
-void secp256k1_fe_sqr_inner(in out uint r, in const uint a) {
+void secp256k1_fe_sqr_inner(in out uint[10] r, in const uint[10] a) {
     uint64_t c, d;
     uint64_t u0, u1, u2, u3, u4, u5, u6, u7, u8;
     uint t9, t0, t1, t2, t3, t4, t5, t6, t7;
-    const uint M = 0x3FFFFFF, R0 = 0x3D10, R1 = 0x400;
+    const uint64_t M = 0x3FFFFFF, R0 = 0x3D10, R1 = 0x400;
 
     d  = uint64_t(a[0]*2) * a[9]
        + uint64_t(a[1]*2) * a[8]
        + uint64_t(a[2]*2) * a[7]
        + uint64_t(a[3]*2) * a[6]
        + uint64_t(a[4]*2) * a[5];
-    t9 = d & M; d >>= 26;
+    t9 = uint(d & M); d >>= 26;
     c  = uint64_t(a[0]) * a[0];
     d += uint64_t(a[1]*2) * a[9]
        + uint64_t(a[2]*2) * a[8]
        + uint64_t(a[3]*2) * a[7]
        + uint64_t(a[4]*2) * a[6]
        + uint64_t(a[5]) * a[5];
-    u0 = d & M; d >>= 26; c += u0 * R0;
-    t0 = c & M; c >>= 26; c += u0 * R1;
+    u0 = uint(d & M); d >>= 26; c += u0 * R0;
+    t0 = uint(c & M); c >>= 26; c += u0 * R1;
 
     c += uint64_t(a[0]*2) * a[1];
     d += uint64_t(a[2]*2) * a[9]
        + uint64_t(a[3]*2) * a[8]
        + uint64_t(a[4]*2) * a[7]
        + uint64_t(a[5]*2) * a[6];
-    u1 = d & M; d >>= 26; c += u1 * R0;
-    t1 = c & M; c >>= 26; c += u1 * R1;
+    u1 = uint(d & M); d >>= 26; c += u1 * R0;
+    t1 = uint(c & M); c >>= 26; c += u1 * R1;
 
     c += uint64_t(a[0]*2) * a[2]
        + uint64_t(a[1]) * a[1];
@@ -370,66 +370,66 @@ void secp256k1_fe_sqr_inner(in out uint r, in const uint a) {
        + uint64_t(a[4]*2) * a[8]
        + uint64_t(a[5]*2) * a[7]
        + uint64_t(a[6]) * a[6];
-    u2 = d & M; d >>= 26; c += u2 * R0;
-    t2 = c & M; c >>= 26; c += u2 * R1;
+    u2 = uint(d & M); d >>= 26; c += u2 * R0;
+    t2 = uint(c & M); c >>= 26; c += u2 * R1;
     c += uint64_t(a[0]*2) * a[3]
        + uint64_t(a[1]*2) * a[2];
     d += uint64_t(a[4]*2) * a[9]
        + uint64_t(a[5]*2) * a[8]
        + uint64_t(a[6]*2) * a[7];
-    u3 = d & M; d >>= 26; c += u3 * R0;
-    t3 = c & M; c >>= 26; c += u3 * R1;
+    u3 = uint(d & M); d >>= 26; c += u3 * R0;
+    t3 = uint(c & M); c >>= 26; c += u3 * R1;
     c += uint64_t(a[0]*2) * a[4]
        + uint64_t(a[1]*2) * a[3]
        + uint64_t(a[2]) * a[2];
     d += uint64_t(a[5]*2) * a[9]
        + uint64_t(a[6]*2) * a[8]
        + uint64_t(a[7]) * a[7];
-    u4 = d & M; d >>= 26; c += u4 * R0;
-    t4 = c & M; c >>= 26; c += u4 * R1;
+    u4 = uint(d & M); d >>= 26; c += u4 * R0;
+    t4 = uint(c & M); c >>= 26; c += u4 * R1;
     c += uint64_t(a[0]*2) * a[5]
        + uint64_t(a[1]*2) * a[4]
        + uint64_t(a[2]*2) * a[3];
     d += uint64_t(a[6]*2) * a[9]
        + uint64_t(a[7]*2) * a[8];
-    u5 = d & M; d >>= 26; c += u5 * R0;
-    t5 = c & M; c >>= 26; c += u5 * R1;
+    u5 = uint(d & M); d >>= 26; c += u5 * R0;
+    t5 = uint(c & M); c >>= 26; c += u5 * R1;
     c += uint64_t(a[0]*2) * a[6]
        + uint64_t(a[1]*2) * a[5]
        + uint64_t(a[2]*2) * a[4]
        + uint64_t(a[3]) * a[3];
     d += uint64_t(a[7]*2) * a[9]
        + uint64_t(a[8]) * a[8];
-    u6 = d & M; d >>= 26; c += u6 * R0;
-    t6 = c & M; c >>= 26; c += u6 * R1;
+    u6 = uint(d & M); d >>= 26; c += u6 * R0;
+    t6 = uint(c & M); c >>= 26; c += u6 * R1;
     c += uint64_t(a[0]*2) * a[7]
        + uint64_t(a[1]*2) * a[6]
        + uint64_t(a[2]*2) * a[5]
        + uint64_t(a[3]*2) * a[4];
     d += uint64_t(a[8]*2) * a[9];
-    u7 = d & M; d >>= 26; c += u7 * R0;
-    t7 = c & M; c >>= 26; c += u7 * R1;
+    u7 = uint(d & M); d >>= 26; c += u7 * R0;
+    t7 = uint(c & M); c >>= 26; c += u7 * R1;
     c += uint64_t(a[0]*2) * a[8]
        + uint64_t(a[1]*2) * a[7]
        + uint64_t(a[2]*2) * a[6]
        + uint64_t(a[3]*2) * a[5]
        + uint64_t(a[4]) * a[4];
     d += uint64_t(a[9]) * a[9];
-    u8 = d & M; d >>= 26; c += u8 * R0;
+    u8 = uint(d & M); d >>= 26; c += u8 * R0;
     r[3] = t3;
     r[4] = t4;
     r[5] = t5;
     r[6] = t6;
     r[7] = t7;
-    r[8] = c & M; c >>= 26; c += u8 * R1;
+    r[8] = uint(c & M); c >>= 26; c += u8 * R1;
     c   += d * R0 + t9;
-    r[9] = c & (M >> 4); c >>= 22; c += d * (R1 << 4);
+    r[9] = uint(c & (M >> 4)); c >>= 22; c += d * (R1 << 4);
     d    = c * (R0 >> 4) + t0;
-    r[0] = d & M; d >>= 26;
+    r[0] = uint(d & M); d >>= 26;
     d   += c * (R1 >> 4) + t1;
-    r[1] = d & M; d >>= 26;
+    r[1] = uint(d & M); d >>= 26;
     d   += t2;
-    r[2] = d;
+    r[2] = uint(d);
 }
 
 void secp256k1_fe_sqr(in out secp256k1_fe r, in const secp256k1_fe a) {

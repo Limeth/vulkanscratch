@@ -13,8 +13,8 @@ use std::sync::Arc;
 use std::rc::Rc;
 use vulkano::command_buffer::CommandBuffer;
 use vulkano::command_buffer::submit::SubmitCommandBufferBuilder;
-use vulkano::image::traits::Image;
 use vulkano::sync::GpuFuture;
+use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
 use rand::os::OsRng;
 use rand::Rng;
 use secp256k1::{Secp256k1, ContextFlag};
@@ -28,22 +28,23 @@ struct WorkerDevice<'a> {
     device: Arc<vulkano::device::Device>,
     max_invocations: usize,
     queue: Arc<vulkano::device::Queue>,
-    input_buffer: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>,
+    // input_buffer: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>,
     output_buffer: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>,
     pipeline: Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>,
-    set: std::sync::Arc<vulkano::descriptor::descriptor_set::SimpleDescriptorSet<(((), vulkano::descriptor::descriptor_set::SimpleDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>>), vulkano::descriptor::descriptor_set::SimpleDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>>)>>,
+// std::sync::Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>
+    set: std::sync::Arc<vulkano::descriptor::descriptor_set::PersistentDescriptorSet<std::sync::Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>, (((), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::Context>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>>)>>,
 }
 
 impl<'a> WorkerDevice<'a> {
     fn new(physical_device: vulkano::instance::PhysicalDevice<'a>, secp256k1_context: Rc<Secp256k1Context>) -> Self {
         // possibly filter out the queue with required features
         let queue = physical_device.queue_families().next().expect("Could not find any queue.");
-        let (device, mut queues) = vulkano::device::Device::new(&physical_device,
+        let (device, mut queues) = vulkano::device::Device::new(physical_device,
                                                                 physical_device.supported_features(),
                                                                 &vulkano::device::DeviceExtensions::none(),
                                                                 [(queue, 0.5)].iter().cloned())
             .expect("failed to create device");
-        let max_invocations: usize = 128;
+        let max_invocations: usize = 1;
         let queue = queues.next().unwrap();
         let context_buffer = vulkano::buffer::immutable::ImmutableBuffer::from_data(
             shader::ty::Context {
@@ -52,21 +53,26 @@ impl<'a> WorkerDevice<'a> {
             vulkano::buffer::BufferUsage::uniform_buffer(),
             Some(queue.family()),
             queue.clone(),
-        ).expect("failed to create input buffer");
+        ).expect("failed to create input buffer").0;
         let mut rng = OsRng::new().expect("Could not create a safe system random number generator.");
-        let input_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
-                                   (0 .. max_invocations * SECRET_KEY_INT_ARRAY_LENGTH).map(|_| rng.next_u32()))
-            .expect("failed to create input buffer");
+        // let input_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
+        //                            (0 .. max_invocations * SECRET_KEY_INT_ARRAY_LENGTH).map(|_| rng.next_u32()))
+        //     .expect("failed to create input buffer");
         let output_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
                                    (0 .. max_invocations).map(|_| 0))
             .expect("failed to create output buffer");
-        let shader = shader::Shader::load(&device).expect("Derp.");
+        let shader = shader::Shader::load(device.clone()).expect("Derp.");
         let entry_point = shader.main_entry_point();
         let pipeline = Arc::new(vulkano::pipeline::ComputePipeline::new(device.clone(), &entry_point, &()).unwrap());
-        let set = Arc::new(simple_descriptor_set!(pipeline.clone(), 0, {
-            input_data: input_buffer.clone(),
-            output_data: output_buffer.clone(),
-        }));
+        let set = Arc::new(PersistentDescriptorSet::start(pipeline.clone(), 0)
+            .add_buffer(context_buffer.clone()).unwrap()
+            // .add_buffer(input_buffer.clone()).unwrap()
+            .add_buffer(output_buffer.clone()).unwrap()
+            .build().unwrap());
+        // let set = Arc::new(simple_descriptor_set!(pipeline.clone(), 0, {
+        //     input_data: input_buffer.clone(),
+        //     output_data: output_buffer.clone(),
+        // }));
 
         WorkerDevice {
             physical_device,
@@ -76,7 +82,7 @@ impl<'a> WorkerDevice<'a> {
             // or the Vulkan equivalent.
             max_invocations,
             queue,
-            input_buffer,
+            // input_buffer,
             output_buffer,
             pipeline,
             set,
@@ -167,7 +173,7 @@ fn main() {
             // }}}
 
             // {{{ convert bytes to u32s
-            let mut input_buffer = device.input_buffer.write().unwrap();
+            let mut input_buffer = [0u32; 6 * 8]; //device.input_buffer.write().unwrap();
 
             for x in &mut input_buffer[0 .. 6 * 8] { *x = 0x00; }
 
@@ -180,6 +186,9 @@ fn main() {
                     input_buffer[abs_integer] |= (buffer_content[abs_byte] as u32) << bitshift;
                 }
             }
+
+            for x in input_buffer.iter() { println!("{}", x) }
+
             // }}}
         }
 

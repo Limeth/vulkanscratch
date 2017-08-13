@@ -1,3 +1,5 @@
+#![feature(concat_idents)]
+
 #[macro_use]
 extern crate vulkano;
 #[macro_use]
@@ -32,11 +34,25 @@ struct WorkerDevice<'a> {
     output_buffer: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>,
     pipeline: Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>,
 // std::sync::Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>
-    set: std::sync::Arc<vulkano::descriptor::descriptor_set::PersistentDescriptorSet<std::sync::Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>, (((), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::Context>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>>)>>,
+    set: std::sync::Arc<vulkano::descriptor::descriptor_set::PersistentDescriptorSet<std::sync::Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>, (((((((), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartPrecQuarterFirst>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartPrecQuarterSecond>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartPrecQuarterThird>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartPrecQuarterFourth>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartRest>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>>)>>,
 }
 
 impl<'a> WorkerDevice<'a> {
     fn new(physical_device: vulkano::instance::PhysicalDevice<'a>, secp256k1_context: Rc<Secp256k1Context>) -> Self {
+        macro_rules! declare_context_buffer_part_prec_quarter {
+            ($queue:ident, $method:ident, $shader_type:ident) => {
+                vulkano::buffer::immutable::ImmutableBuffer::from_data(
+                    shader::ty::$shader_type {
+                        prec_quarter: Secp256k1Context::$method(secp256k1_context.as_ref()),
+                    },
+                    vulkano::buffer::BufferUsage::uniform_buffer(),
+                    Some($queue.family()),
+                    $queue.clone(),
+                ).expect("failed to create input buffer").0;
+            }
+        }
+
+        println!("Physical device max uniform buffer range: {}", physical_device.limits().max_uniform_buffer_range());
         // possibly filter out the queue with required features
         let queue = physical_device.queue_families().next().expect("Could not find any queue.");
         let (device, mut queues) = vulkano::device::Device::new(physical_device,
@@ -46,9 +62,13 @@ impl<'a> WorkerDevice<'a> {
             .expect("failed to create device");
         let max_invocations: usize = 1;
         let queue = queues.next().unwrap();
-        let context_buffer = vulkano::buffer::immutable::ImmutableBuffer::from_data(
-            shader::ty::Context {
-                context: secp256k1_context.as_ref().into(),
+        let context_buffer_part_prec_quarter_first = declare_context_buffer_part_prec_quarter!(queue, get_ecmult_gen_context_part_prec_quarter_first, ContextBufferPartPrecQuarterFirst);
+        let context_buffer_part_prec_quarter_second = declare_context_buffer_part_prec_quarter!(queue, get_ecmult_gen_context_part_prec_quarter_second, ContextBufferPartPrecQuarterSecond);
+        let context_buffer_part_prec_quarter_third = declare_context_buffer_part_prec_quarter!(queue, get_ecmult_gen_context_part_prec_quarter_third, ContextBufferPartPrecQuarterThird);
+        let context_buffer_part_prec_quarter_fourth = declare_context_buffer_part_prec_quarter!(queue, get_ecmult_gen_context_part_prec_quarter_fourth, ContextBufferPartPrecQuarterFourth);
+        let context_buffer_part_rest = vulkano::buffer::immutable::ImmutableBuffer::from_data(
+            shader::ty::ContextBufferPartRest {
+                context_rest: secp256k1_context.as_ref().get_ecmult_gen_context_part_rest(),
             },
             vulkano::buffer::BufferUsage::uniform_buffer(),
             Some(queue.family()),
@@ -65,7 +85,11 @@ impl<'a> WorkerDevice<'a> {
         let entry_point = shader.main_entry_point();
         let pipeline = Arc::new(vulkano::pipeline::ComputePipeline::new(device.clone(), &entry_point, &()).unwrap());
         let set = Arc::new(PersistentDescriptorSet::start(pipeline.clone(), 0)
-            .add_buffer(context_buffer.clone()).unwrap()
+            .add_buffer(context_buffer_part_prec_quarter_first.clone()).unwrap()
+            .add_buffer(context_buffer_part_prec_quarter_second.clone()).unwrap()
+            .add_buffer(context_buffer_part_prec_quarter_third.clone()).unwrap()
+            .add_buffer(context_buffer_part_prec_quarter_fourth.clone()).unwrap()
+            .add_buffer(context_buffer_part_rest.clone()).unwrap()
             // .add_buffer(input_buffer.clone()).unwrap()
             .add_buffer(output_buffer.clone()).unwrap()
             .build().unwrap());

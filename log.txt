@@ -1,0 +1,137 @@
+DebugReport debug: Added callback
+DebugReport debug: Added callback
+DebugReport debug: Added callback
+DebugReport debug: Added callback
+ObjectTracker information: OBJ[0x2] : CREATE DebugReportCallbackEXT object 0x7fd04d421008
+DebugReport debug: Added callback
+DebugReport debug: Added callback
+loader debug: Device Extension: VK_KHR_swapchain (libGLX_nvidia.so.0) version 0.0.68
+loader debug: Device Extension: VK_KHR_descriptor_update_template (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHR_maintenance1 (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHR_push_descriptor (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHR_shader_draw_parameters (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHR_sampler_mirror_clamp_to_edge (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHX_device_group (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHX_external_memory (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHX_external_memory_fd (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHX_external_semaphore (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHX_external_semaphore_fd (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHX_multiview (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_EXT_discard_rectangles (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_EXT_shader_subgroup_ballot (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_EXT_shader_subgroup_vote (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_EXT_display_control (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_dedicated_allocation (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_glsl_shader (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_clip_space_w_scaling (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_sample_mask_override_coverage (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_viewport_array2 (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_viewport_swizzle (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_geometry_shader_passthrough (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NVX_device_generated_commands (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NVX_multiview_per_view_attributes (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHR_swapchain (Unknown) version 0.0.68
+loader debug: Device Extension: VK_KHR_descriptor_update_template (Unknown) version 0.0.1
+loader debug: Device Extension: VK_KHR_maintenance1 (Unknown) version 0.0.1
+loader debug: Device Extension: VK_KHR_push_descriptor (Unknown) version 0.0.1
+loader debug: Device Extension: VK_KHR_shader_draw_parameters (Unknown) version 0.0.1
+loader debug: Device Extension: VK_KHR_sampler_mirror_clamp_to_edge (Unknown) version 0.0.1
+loader debug: Device Extension: VK_KHX_device_group (Unknown) version 0.0.1
+loader debug: Device Extension: VK_KHX_external_memory (Unknown) version 0.0.1
+loader debug: Device Extension: VK_KHX_external_memory_fd (Unknown) version 0.0.1
+loader debug: Device Extension: VK_KHX_external_semaphore (Unknown) version 0.0.1
+loader debug: Device Extension: VK_KHX_external_semaphore_fd (Unknown) version 0.0.1
+loader debug: Device Extension: VK_KHX_multiview (Unknown) version 0.0.1
+loader debug: Device Extension: VK_EXT_discard_rectangles (Unknown) version 0.0.1
+loader debug: Device Extension: VK_EXT_shader_subgroup_ballot (Unknown) version 0.0.1
+loader debug: Device Extension: VK_EXT_shader_subgroup_vote (Unknown) version 0.0.1
+loader debug: Device Extension: VK_EXT_display_control (Unknown) version 0.0.1
+loader debug: Device Extension: VK_NV_dedicated_allocation (Unknown) version 0.0.1
+loader debug: Device Extension: VK_NV_glsl_shader (Unknown) version 0.0.1
+loader debug: Device Extension: VK_NV_clip_space_w_scaling (Unknown) version 0.0.1
+loader debug: Device Extension: VK_NV_sample_mask_override_coverage (Unknown) version 0.0.1
+loader debug: Device Extension: VK_NV_viewport_array2 (Unknown) version 0.0.1
+loader debug: Device Extension: VK_NV_viewport_swizzle (Unknown) version 0.0.1
+loader debug: Device Extension: VK_NV_geometry_shader_passthrough (Unknown) version 0.0.1
+loader debug: Device Extension: VK_NVX_device_generated_commands (Unknown) version 0.0.1
+loader debug: Device Extension: VK_NVX_multiview_per_view_attributes (Unknown) version 0.0.1
+loader debug: Loading layer library libVkLayer_unique_objects.so
+loader information: Insert device layer VK_LAYER_GOOGLE_unique_objects (libVkLayer_unique_objects.so)
+loader debug: Loading layer library libVkLayer_swapchain.so
+loader information: Insert device layer VK_LAYER_LUNARG_swapchain (libVkLayer_swapchain.so)
+loader debug: Loading layer library libVkLayer_core_validation.so
+loader information: Insert device layer VK_LAYER_LUNARG_core_validation (libVkLayer_core_validation.so)
+loader debug: Loading layer library libVkLayer_object_tracker.so
+loader information: Insert device layer VK_LAYER_LUNARG_object_tracker (libVkLayer_object_tracker.so)
+loader debug: Loading layer library libVkLayer_parameter_validation.so
+loader information: Insert device layer VK_LAYER_LUNARG_parameter_validation (libVkLayer_parameter_validation.so)
+loader debug: Loading layer library libVkLayer_threading.so
+loader information: Insert device layer VK_LAYER_GOOGLE_threading (libVkLayer_threading.so)
+loader debug: Device Extension: VK_KHR_swapchain (libGLX_nvidia.so.0) version 0.0.68
+loader debug: Device Extension: VK_KHR_descriptor_update_template (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHR_maintenance1 (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHR_push_descriptor (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHR_shader_draw_parameters (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHR_sampler_mirror_clamp_to_edge (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHX_device_group (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHX_external_memory (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHX_external_memory_fd (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHX_external_semaphore (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHX_external_semaphore_fd (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_KHX_multiview (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_EXT_discard_rectangles (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_EXT_shader_subgroup_ballot (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_EXT_shader_subgroup_vote (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_EXT_display_control (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_dedicated_allocation (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_glsl_shader (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_clip_space_w_scaling (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_sample_mask_override_coverage (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_viewport_array2 (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_viewport_swizzle (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NV_geometry_shader_passthrough (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NVX_device_generated_commands (libGLX_nvidia.so.0) version 0.0.1
+loader debug: Device Extension: VK_NVX_multiview_per_view_attributes (libGLX_nvidia.so.0) version 0.0.1
+ObjectTracker information: OBJ[0x3] : CREATE Device object 0x7fd04d510800
+ObjectTracker information: OBJ[0x4] : CREATE VK_DEBUG_REPORT_OBJECT_TYPE_QUEUE_EXT object 0x7fd04d415900
+ObjectTracker information: OBJ[0x5] : CREATE Buffer object 0x1
+ObjectTracker information: OBJ[0x6] : CREATE DeviceMemory object 0x2
+ObjectTracker information: OBJ[0x7] : CREATE Buffer object 0x3
+ObjectTracker information: OBJ[0x8] : CREATE DeviceMemory object 0x4
+ObjectTracker information: OBJ[0x9] : CREATE CommandPool object 0x5
+ObjectTracker information: OBJ[0xa] : CREATE VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT object 0x7fd049c4cc00
+ObjectTracker information: OBJ[0xb] : CREATE Buffer object 0x6
+ObjectTracker information: OBJ[0xc] : CREATE Buffer object 0x7
+ObjectTracker information: OBJ[0xd] : CREATE ShaderModule object 0x8
+ObjectTracker information: OBJ[0xe] : CREATE DescriptorSetLayout object 0x9
+ObjectTracker information: OBJ[0xf] : CREATE PipelineLayout object 0xa
+Driver error: Compute info
+------------
+(0) : error C6007: Constant register limit exceeded; more than 1024 constant registers needed to compiled program
+(0) : error C6007: Constant register limit exceeded; more than 1024 constant registers needed to compiled program
+(0) : error C6007: Constant register limit exceeded; more than 1024 constant registers needed to compiled program
+... literally 12 000+ more of the same lines
+(0) : error C6007: Constant register limit exceeded; more than 1024 constant registers needed to compiled program
+(0) : error C6020: Constant register limit exceeded at infinity; more than 1024 registers needed to compiled program
+(0) : error C6020: Constant register limit exceeded at prec; more than 1024 registers needed to compiled program
+
+ParameterValidation warning: vkCreateComputePipelines: returned VK_ERROR_INVALID_SHADER_NV, indicating that one or more shaders failed to compile or link
+ObjectTracker information: OBJ_STAT Destroy PipelineLayout obj 0xa (12 total objs remain & 0 PipelineLayout objs).
+ObjectTracker information: OBJ_STAT Destroy DescriptorSetLayout obj 0x9 (11 total objs remain & 0 DescriptorSetLayout objs).
+ObjectTracker information: OBJ_STAT Destroy ShaderModule obj 0x8 (10 total objs remain & 0 ShaderModule objs).
+ObjectTracker information: OBJ_STAT Destroy Buffer obj 0x7 (9 total objs remain & 3 Buffer objs).
+ObjectTracker information: OBJ_STAT Destroy Buffer obj 0x6 (8 total objs remain & 2 Buffer objs).
+ObjectTracker information: OBJ_STAT Destroy CommandBuffer obj 0x7fd049c4cc00 (7 total objs remain & 0 CommandBuffer objs).
+ObjectTracker information: OBJ_STAT Destroy CommandPool obj 0x5 (6 total objs remain & 0 CommandPool objs).
+ObjectTracker information: OBJ_STAT Destroy Buffer obj 0x1 (5 total objs remain & 1 Buffer objs).
+ObjectTracker information: OBJ_STAT Destroy Buffer obj 0x3 (4 total objs remain & 0 Buffer objs).
+ObjectTracker information: OBJ_STAT Destroy DeviceMemory obj 0x2 (3 total objs remain & 1 DeviceMemory objs).
+ObjectTracker information: OBJ_STAT Destroy DeviceMemory obj 0x4 (2 total objs remain & 0 DeviceMemory objs).
+ObjectTracker information: OBJ_STAT Destroy Device obj 0x7fd04d510800 (1 total objs remain & 0 Device objs).
+ObjectTracker information: OBJ_STAT Destroy Queue obj 0x7fd04d415900 (0 total objs remain & 0 Queue objs).
+loader debug: Unloading layer library libVkLayer_threading.so
+loader debug: Unloading layer library libVkLayer_parameter_validation.so
+loader debug: Unloading layer library libVkLayer_object_tracker.so
+loader debug: Unloading layer library libVkLayer_core_validation.so
+loader debug: Unloading layer library libVkLayer_swapchain.so
+loader debug: Unloading layer library libVkLayer_unique_objects.so

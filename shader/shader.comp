@@ -55,6 +55,15 @@ struct secp256k1_ecmult_gen_context {
     secp256k1_gej initial;
 };
 
+struct secp256k1_ecmult_gen_context_part_prec_quarter {
+    secp256k1_ge_storage[16][16] array_quarter;  // (*prec);
+};
+
+struct secp256k1_ecmult_gen_context_part_rest {
+    secp256k1_scalar blind;
+    secp256k1_gej initial;
+};
+
 // secp256k1_context_struct == secp256k1_context
 struct secp256k1_context_struct {
     /* secp256k1_ecmult_context ecmult_ctx; */
@@ -800,20 +809,65 @@ void secp256k1_ec_pubkey_create(
 // local workgroup dimensions
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
-layout(set = 0, binding = 0) uniform Context {
-    secp256k1_context_struct context;
-} context_buffer;
+// We need to split the prec array because it's so large it cannot be
+// transferred to the gpu as a uniform buffer.
+layout(set = 0, binding = 0) uniform ContextBufferPartPrecQuarterFirst {
+    secp256k1_ecmult_gen_context_part_prec_quarter prec_quarter;
+} context_buffer_part_prec_quarter_first;
 
-layout(set = 0, binding = 1) buffer InputData {
-    uint array[][8];
-} input_data;
+layout(set = 0, binding = 1) uniform ContextBufferPartPrecQuarterSecond {
+    secp256k1_ecmult_gen_context_part_prec_quarter prec_quarter;
+} context_buffer_part_prec_quarter_second;
 
-layout(set = 0, binding = 2) buffer OutputData {
+layout(set = 0, binding = 2) uniform ContextBufferPartPrecQuarterThird {
+    secp256k1_ecmult_gen_context_part_prec_quarter prec_quarter;
+} context_buffer_part_prec_quarter_third;
+
+layout(set = 0, binding = 3) uniform ContextBufferPartPrecQuarterFourth {
+    secp256k1_ecmult_gen_context_part_prec_quarter prec_quarter;
+} context_buffer_part_prec_quarter_fourth;
+
+layout(set = 0, binding = 4) uniform ContextBufferPartRest {
+    secp256k1_ecmult_gen_context_part_rest context_rest;
+} context_buffer_part_rest;
+
+layout(set = 0, binding = 5) buffer OutputData {
     uint array[];
 } output_data;
 
+secp256k1_context_struct construct_context() {
+    secp256k1_ge_storage[64][16] prec;
+
+    for (int i = 0; i < 16; i++) {
+        prec[i     ] = context_buffer_part_prec_quarter_first.prec_quarter.array_quarter[i];
+    }
+
+    for (int i = 0; i < 16; i++) {
+        prec[i + 16] = context_buffer_part_prec_quarter_second.prec_quarter.array_quarter[i];
+    }
+
+    for (int i = 0; i < 16; i++) {
+        prec[i + 32] = context_buffer_part_prec_quarter_third.prec_quarter.array_quarter[i];
+    }
+
+    for (int i = 0; i < 16; i++) {
+        prec[i + 48] = context_buffer_part_prec_quarter_fourth.prec_quarter.array_quarter[i];
+    }
+
+    return secp256k1_context_struct(
+        secp256k1_ecmult_gen_context(
+            prec,
+            context_buffer_part_rest.context_rest.blind,
+            context_buffer_part_rest.context_rest.initial
+        )
+    );
+}
+
 void main() {
-    secp256k1_scalar seckey = secp256k1_scalar(input_data.array[gl_GlobalInvocationID.x]);
+    secp256k1_context_struct context = construct_context();
+
+    /* secp256k1_scalar seckey = secp256k1_scalar(input_data.array[gl_GlobalInvocationID.x]); */
+    secp256k1_scalar seckey = secp256k1_scalar(uint[8] ( 0, 0, 0, 0, 0, 0, 0, 0 ));
 
     if(!secp256k1_ec_seckey_verify(seckey)) {
         output_data.array[gl_GlobalInvocationID.x] = 0;
@@ -824,5 +878,5 @@ void main() {
     secp256k1_scalar pubkey;
 
     // We assume success as we already checked the validity of the secret key.
-    secp256k1_ec_pubkey_create(context_buffer.context.ctx, pubkey, seckey);
+    secp256k1_ec_pubkey_create(context.ctx, pubkey, seckey);
 }

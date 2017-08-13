@@ -155,30 +155,51 @@ impl Secp256k1Context {
     unsafe fn transmute_ctx(&self) -> &secp256k1_context {
         return &*(self.ctx as *mut secp256k1_context)
     }
-}
 
-impl<'a> From<&'a Secp256k1Context> for shader::ty::secp256k1_context_struct {
-    fn from(from: &'a Secp256k1Context) -> Self {
+    fn get_ecmult_gen_context_part_prec_quarter_offset(&self, offset: usize) -> shader::ty::secp256k1_ecmult_gen_context_part_prec_quarter {
         unsafe {
-            let context = from.transmute_ctx();
+            let context = self.transmute_ctx();
 
-            shader::ty::secp256k1_context_struct {
-                ctx: shader::ty::secp256k1_ecmult_gen_context {
-                    prec: {
-                        let mut result = [[mem::uninitialized::<shader::ty::secp256k1_ge_storage>(); 16]; 64];
+            shader::ty::secp256k1_ecmult_gen_context_part_prec_quarter {
+                array_quarter: {
+                    let mut result = [[mem::uninitialized::<shader::ty::secp256k1_ge_storage>(); 16]; 16];
 
-                        for (subarray_index, subarray) in result.iter_mut().enumerate() {
-                            for (index, item) in subarray.iter_mut().enumerate() {
-                                *item = (&(*context.ecmult_gen_ctx.prec)[subarray_index][index]).into();
-                            }
+                    for (subarray_index, subarray) in result.iter_mut().enumerate() {
+                        for (index, item) in subarray.iter_mut().enumerate() {
+                            *item = (&(*context.ecmult_gen_ctx.prec)[subarray_index + offset][index]).into();
                         }
+                    }
 
-                        result
-                    },
-                    blind: (&context.ecmult_gen_ctx.blind).into(),
-                    initial: (&context.ecmult_gen_ctx.initial).into(),
-                    _dummy0: unsafe { mem::zeroed() },
+                    result
                 }
+            }
+        }
+    }
+
+    pub fn get_ecmult_gen_context_part_prec_quarter_first(&self) -> shader::ty::secp256k1_ecmult_gen_context_part_prec_quarter {
+        self.get_ecmult_gen_context_part_prec_quarter_offset(0)
+    }
+
+    pub fn get_ecmult_gen_context_part_prec_quarter_second(&self) -> shader::ty::secp256k1_ecmult_gen_context_part_prec_quarter {
+        self.get_ecmult_gen_context_part_prec_quarter_offset(16)
+    }
+
+    pub fn get_ecmult_gen_context_part_prec_quarter_third(&self) -> shader::ty::secp256k1_ecmult_gen_context_part_prec_quarter {
+        self.get_ecmult_gen_context_part_prec_quarter_offset(32)
+    }
+
+    pub fn get_ecmult_gen_context_part_prec_quarter_fourth(&self) -> shader::ty::secp256k1_ecmult_gen_context_part_prec_quarter {
+        self.get_ecmult_gen_context_part_prec_quarter_offset(48)
+    }
+
+    pub fn get_ecmult_gen_context_part_rest(&self) -> shader::ty::secp256k1_ecmult_gen_context_part_rest {
+        unsafe {
+            let context = self.transmute_ctx();
+
+            shader::ty::secp256k1_ecmult_gen_context_part_rest {
+                blind: (&context.ecmult_gen_ctx.blind).into(),
+                initial: (&context.ecmult_gen_ctx.initial).into(),
+                _dummy0: unsafe { mem::zeroed() },
             }
         }
     }

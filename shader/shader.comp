@@ -806,6 +806,12 @@ void secp256k1_ec_pubkey_create(
 
 // }}}
 
+struct invocation_result {
+    uint success;
+    uint[8] secret_key;
+    uint[16] public_key;
+};
+
 // local workgroup dimensions
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
@@ -832,7 +838,7 @@ layout(set = 0, binding = 4) uniform ContextBufferPartRest {
 } context_buffer_part_rest;
 
 layout(set = 0, binding = 5) buffer OutputData {
-    uint array[];
+    invocation_result[] array;
 } output_data;
 
 secp256k1_context_struct construct_context() {
@@ -866,17 +872,33 @@ secp256k1_context_struct construct_context() {
 void main() {
     secp256k1_context_struct context = construct_context();
 
+    uint[6][8] input_data = uint[6][8] (
+        uint[8] (3493216577, 3218235020, 2940772411, 3132021990, 4294967294,
+            4294967295, 4294967295, 4294967295),
+        uint[8] (4294967295, 4294967295, 4294967295, 4294967295, 4294967295,
+            4294967295, 4294967295, 4294967295),
+        uint[8] (0, 0, 0, 0, 0, 0, 0, 0),
+        uint[8] (1, 0, 0, 0, 0, 0, 0, 0),
+        uint[8] (3493216578, 3218235020, 2940772411, 3132021990, 4294967294,
+            4294967295, 4294967295, 4294967295),
+        uint[8] (3493216576, 3218235020, 2940772411, 3132021990, 4294967294,
+            4294967295, 4294967295, 4294967295)
+            );
+
+    secp256k1_scalar seckey = secp256k1_scalar(input_data[gl_GlobalInvocationID.x]);
     /* secp256k1_scalar seckey = secp256k1_scalar(input_data.array[gl_GlobalInvocationID.x]); */
-    secp256k1_scalar seckey = secp256k1_scalar(uint[8] ( 0, 0, 0, 0, 0, 0, 0, 0 ));
+    /* secp256k1_scalar seckey = secp256k1_scalar(uint[8] ( 0, 0, 0, 0, 0, 0, 0, 0 )); */
 
     if(!secp256k1_ec_seckey_verify(seckey)) {
-        output_data.array[gl_GlobalInvocationID.x] = 0;
+        output_data.array[gl_GlobalInvocationID.x].success = 0;
         return;
     }
 
-    output_data.array[gl_GlobalInvocationID.x] = 1;
-    secp256k1_scalar pubkey;
+    output_data.array[gl_GlobalInvocationID.x].success = 1;
 
-    // We assume success as we already checked the validity of the secret key.
-    secp256k1_ec_pubkey_create(context.ctx, pubkey, seckey);
+    /* output_data.array[gl_GlobalInvocationID.x] = 1; */
+    /* secp256k1_scalar pubkey; */
+
+    /* // We assume success as we already checked the validity of the secret key. */
+    /* secp256k1_ec_pubkey_create(context.ctx, pubkey, seckey); */
 }

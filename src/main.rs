@@ -20,10 +20,12 @@ use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
 use rand::os::OsRng;
 use rand::Rng;
 use secp256k1::{Secp256k1, ContextFlag};
+use secp256k1::key::PublicKey;
 use secp256k1::key::SecretKey;
 use context::Secp256k1Context;
 
 const SECRET_KEY_INT_ARRAY_LENGTH: usize = 8;
+const PUBLIC_KEY_INT_ARRAY_LENGTH: usize = SECRET_KEY_INT_ARRAY_LENGTH * 2;
 
 struct WorkerDevice<'a> {
     physical_device: vulkano::instance::PhysicalDevice<'a>,
@@ -31,10 +33,10 @@ struct WorkerDevice<'a> {
     max_invocations: usize,
     queue: Arc<vulkano::device::Queue>,
     // input_buffer: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>,
-    output_buffer: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>,
+    buffer_output_data: std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[shader::ty::invocation_result]>>,
     pipeline: Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>,
 // std::sync::Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>
-    set: std::sync::Arc<vulkano::descriptor::descriptor_set::PersistentDescriptorSet<std::sync::Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>, (((((((), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartPrecQuarterFirst>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartPrecQuarterSecond>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartPrecQuarterThird>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartPrecQuarterFourth>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartRest>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[u32]>>>)>>,
+    set: std::sync::Arc<vulkano::descriptor::descriptor_set::PersistentDescriptorSet<std::sync::Arc<vulkano::pipeline::ComputePipeline<vulkano::descriptor::pipeline_layout::PipelineLayout<shader::Layout>>>, (((((((), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartPrecQuarterFirst>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartPrecQuarterSecond>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartPrecQuarterThird>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartPrecQuarterFourth>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::ImmutableBuffer<shader::ty::ContextBufferPartRest>>>), vulkano::descriptor::descriptor_set::PersistentDescriptorSetBuf<std::sync::Arc<vulkano::buffer::CpuAccessibleBuffer<[shader::ty::invocation_result]>>>)>>,
 }
 
 impl<'a> WorkerDevice<'a> {
@@ -60,7 +62,7 @@ impl<'a> WorkerDevice<'a> {
                                                                 &vulkano::device::DeviceExtensions::none(),
                                                                 [(queue, 0.5)].iter().cloned())
             .expect("failed to create device");
-        let max_invocations: usize = 1;
+        let max_invocations: usize = 128;
         let queue = queues.next().unwrap();
         let context_buffer_part_prec_quarter_first = declare_context_buffer_part_prec_quarter!(queue, get_ecmult_gen_context_part_prec_quarter_first, ContextBufferPartPrecQuarterFirst);
         let context_buffer_part_prec_quarter_second = declare_context_buffer_part_prec_quarter!(queue, get_ecmult_gen_context_part_prec_quarter_second, ContextBufferPartPrecQuarterSecond);
@@ -75,11 +77,11 @@ impl<'a> WorkerDevice<'a> {
             queue.clone(),
         ).expect("failed to create input buffer").0;
         let mut rng = OsRng::new().expect("Could not create a safe system random number generator.");
-        // let input_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
+        // let buffer_input_data = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
         //                            (0 .. max_invocations * SECRET_KEY_INT_ARRAY_LENGTH).map(|_| rng.next_u32()))
         //     .expect("failed to create input buffer");
-        let output_buffer = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
-                                   (0 .. max_invocations).map(|_| 0))
+        let buffer_output_data = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
+                                   (0 .. max_invocations).map(|_| unsafe { std::mem::zeroed() }))
             .expect("failed to create output buffer");
         let shader = shader::Shader::load(device.clone()).expect("Derp.");
         let entry_point = shader.main_entry_point();
@@ -90,8 +92,8 @@ impl<'a> WorkerDevice<'a> {
             .add_buffer(context_buffer_part_prec_quarter_third.clone()).unwrap()
             .add_buffer(context_buffer_part_prec_quarter_fourth.clone()).unwrap()
             .add_buffer(context_buffer_part_rest.clone()).unwrap()
-            // .add_buffer(input_buffer.clone()).unwrap()
-            .add_buffer(output_buffer.clone()).unwrap()
+            // .add_buffer(buffer_input_data.clone()).unwrap()
+            .add_buffer(buffer_output_data.clone()).unwrap()
             .build().unwrap());
         // let set = Arc::new(simple_descriptor_set!(pipeline.clone(), 0, {
         //     input_data: input_buffer.clone(),
@@ -106,8 +108,8 @@ impl<'a> WorkerDevice<'a> {
             // or the Vulkan equivalent.
             max_invocations,
             queue,
-            // input_buffer,
-            output_buffer,
+            // buffer_input_data,
+            buffer_output_data,
             pipeline,
             set,
         }
@@ -191,8 +193,19 @@ fn main() {
             let expected_results = [ false, false, false, true, false, true ];
 
             for (i, expected_result) in expected_results.iter().enumerate() {
-                // let u8_buffer: Vec<u8> = buffer_content[i*32 .. (i+1)*32].iter().map(|i| *i as u8).collect();
-                println!("{}: {:?}", expected_result, SecretKey::from_slice(&secp256k1, &buffer_content))
+                let u8_buffer: Vec<u8> = buffer_content[i*32 .. (i+1)*32].iter().map(|i| *i as u8).collect();
+                let actual_result = SecretKey::from_slice(&secp256k1, &u8_buffer);
+
+                if let Ok(sec_key) = actual_result {
+                    let pub_key = PublicKey::from_secret_key(&secp256k1, &sec_key);
+
+                    println!("sec: {:?}", sec_key);
+                    println!("pub: {:?}", pub_key);
+                }
+
+                if (*expected_result != actual_result.is_ok()) {
+                    panic!("Validation of a test secret key failed. Expected: {}, Got: {}; Secret key: {:?}", expected_result, actual_result.is_ok(), u8_buffer);
+                }
             }
             // }}}
 
@@ -211,7 +224,7 @@ fn main() {
                 }
             }
 
-            for x in input_buffer.iter() { println!("{}", x) }
+            // for x in input_buffer.iter() { println!("{}", x) }
 
             // }}}
         }
@@ -232,15 +245,19 @@ fn main() {
 
         future.wait(None).unwrap();
 
-        let output = device.output_buffer.read().expect("could not lock the output buffer");
+        let output = device.buffer_output_data.read().expect("could not lock the output buffer");
+
+        println!("SHADER OUTPUT BEGIN");
 
         for invocation_index in 0 .. device.max_invocations {
             let array_index = invocation_index;
             // for secret_key_int_index in 0 .. SECRET_KEY_INT_ARRAY_LENGTH {
             //     let array_index = invocation_index * SECRET_KEY_INT_ARRAY_LENGTH + secret_key_int_index as usize;
-                println!("{:?}", output[array_index]);
+                println!("[{}]: {:?}", array_index, output[array_index].success);
             // }
         }
+
+        println!("SHADER OUTPUT END");
     })
 }
 

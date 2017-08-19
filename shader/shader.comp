@@ -1120,10 +1120,10 @@ void main() {
 
     output_data.array[gl_GlobalInvocationID.x].success = 1;
 
-    /* secp256k1_pubkey pubkey; */
+    secp256k1_pubkey pubkey;
 
     // We assume success as we already checked the validity of the secret key.
-    /* secp256k1_ec_pubkey_create(context, pubkey, seckey); */
+    secp256k1_ec_pubkey_create(context, pubkey, seckey);
 
     /* output_data.array[gl_GlobalInvocationID.x] = invocation_result(1, seckey.data.d, pubkey.data); */
 }

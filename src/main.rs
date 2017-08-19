@@ -250,11 +250,16 @@ fn main() {
         println!("SHADER OUTPUT BEGIN");
 
         for invocation_index in 0 .. device.max_invocations {
-            let array_index = invocation_index;
-            // for secret_key_int_index in 0 .. SECRET_KEY_INT_ARRAY_LENGTH {
-            //     let array_index = invocation_index * SECRET_KEY_INT_ARRAY_LENGTH + secret_key_int_index as usize;
-                println!("[{}]: {:?}", array_index, output[array_index].success);
-            // }
+            match output[invocation_index].success {
+                0 => {
+                    println!("{}: Failure", invocation_index);
+                }
+                _ => {
+                    println!("{}: Success", invocation_index);
+                    println!("secret_key: {:?}", output[invocation_index].secret_key);
+                    println!("public_key: {:?}", output[invocation_index].public_key);
+                }
+            }
         }
 
         println!("SHADER OUTPUT END");

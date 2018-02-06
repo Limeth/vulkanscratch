@@ -48,7 +48,6 @@ impl<'a> WorkerDevice<'a> {
                         prec_quarter: Secp256k1Context::$method(secp256k1_context.as_ref()),
                     },
                     vulkano::buffer::BufferUsage::uniform_buffer(),
-                    Some($queue.family()),
                     $queue.clone(),
                 ).expect("failed to create input buffer").0;
             }
@@ -73,14 +72,13 @@ impl<'a> WorkerDevice<'a> {
                 context_rest: secp256k1_context.as_ref().get_ecmult_gen_context_part_rest(),
             },
             vulkano::buffer::BufferUsage::uniform_buffer(),
-            Some(queue.family()),
             queue.clone(),
         ).expect("failed to create input buffer").0;
         let mut rng = OsRng::new().expect("Could not create a safe system random number generator.");
         // let buffer_input_data = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
         //                            (0 .. max_invocations * SECRET_KEY_INT_ARRAY_LENGTH).map(|_| rng.next_u32()))
         //     .expect("failed to create input buffer");
-        let buffer_output_data = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(), Some(queue.family()),
+        let buffer_output_data = vulkano::buffer::cpu_access::CpuAccessibleBuffer::from_iter(device.clone(), vulkano::buffer::BufferUsage::all(),
                                    (0 .. max_invocations).map(|_| unsafe { std::mem::zeroed() }))
             .expect("failed to create output buffer");
         let shader = shader::Shader::load(device.clone()).expect("Derp.");
@@ -117,7 +115,7 @@ impl<'a> WorkerDevice<'a> {
 }
 
 fn main() {
-    let application_info = vulkano::instance::ApplicationInfo::from_cargo_toml();
+    let application_info = app_info_from_cargo_toml!();
     let extensions = vulkano::instance::InstanceExtensions {
         ext_debug_report: true,  // TODO: remove debug mode
         ..vulkano::instance::InstanceExtensions::none()
